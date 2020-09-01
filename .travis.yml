@@ -54,7 +54,6 @@ install:
         cd ../../;
     elif [ $TRAVIS_OS_NAME == windows ]; then 
         cd run/windows;
-        ./buildCGAL_MSYS2.sh;
         ./genCBprojectMSYS2.sh;
         cd ../../;
     fi 
