@@ -39,7 +39,6 @@ TARGET_INCLUDE_DIRECTORIES(pfemSolver SYSTEM
 TARGET_LINK_LIBRARIES(pfemSolver
                       PRIVATE ${GMSH_LIBRARIES}
                       PUBLIC ${LUA_LIBRARIES} pfemMesh)
-SET_TARGET_PROPERTIES(pfemSolver PROPERTIES COMPILE_FLAGS "-Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow")
 
 FIND_PACKAGE(Python 3 REQUIRED COMPONENTS Interpreter Development)
 MESSAGE(STATUS "Found python: " ${Python_INCLUDE_DIRS})

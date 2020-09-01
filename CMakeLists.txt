@@ -70,5 +70,13 @@ FIND_PACKAGE(OpenMP REQUIRED)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 
+IF(CMAKE_CXX_COMPILER_ID MATCHES GNU)
+    ADD_COMPILE_OPTIONS(-Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
+ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES CLANG)
+    ADD_COMPILE_OPTIONS(-Wall -Wextra -pedantic-errors -Wold-style-cast -Wnull-dereference -Wshadow)
+ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+    ADD_COMPILE_OPTIONS(/W4 /WX /wd4251)
+ENDIF()
+
 ADD_SUBDIRECTORY(srcs)
 ENABLE_TESTING()
