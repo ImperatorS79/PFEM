@@ -62,9 +62,9 @@ if [ ! -d "sol3" ]; then
 fi
 
 if [ ! -d "gmsh-4.6.0-Windows64-sdk" ]; then
-  wget http://gmsh.info/bin/Linux/gmsh-4.6.0-Linux64-sdk.tgz
-  tar -xf gmsh-4.6.0-Linux64-sdk.tgz 
-  rm -rf gmsh-4.6.0-Linux64-sdk.tgz 
+  wget http://gmsh.info/bin/Windows/gmsh-4.6.0-Windows64-sdk.zip
+  unzip gmsh-4.6.0-Windows64-sdk.zip 
+  rm -rf gmsh-4.6.0-Windows64-sdk
 fi
 
 if [ "$IsShared" = "shared" ]; then 
