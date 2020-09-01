@@ -19,7 +19,7 @@ if [ ! -d "/c/tools/CGAL-5.0.3" ]; then
     cd $HERE
 fi
 
-rm -rf /c/tools/CGAL-5.0.3
+rm -rf /c/tools/cgal-releases-CGAL-5.0.3
 buildType="Release"
 if [ ! -z "$1" ]; then
 	buildType="$1"

@@ -28,7 +28,7 @@ if [ ! -d "gmsh-4.6.0-Windows64-sdk" ]; then
   rm -rf gmsh-4.6.0-Linux64-sdk.tgz 
 fi
 
-export CGAL_DIR=/c/tools/CGAL-5.0.2
+export CGAL_DIR=/c/tools/CGAL-5.0.3
 export GMSHSDK=/c/tools/gmsh-4.6.0-Windows64-sdk #put gmsh sdk here
 export EIGENSDK=/c/tools/msys64/mingw64/include/eigen3
 export SOL3SDK=/c/tools/

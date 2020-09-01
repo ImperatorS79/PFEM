@@ -25,10 +25,12 @@ fi
 
 export GMSHSDK=${PWD}/gmsh-4.6.0-MacOSX-sdk/
 export SOLSDK=${PWD}/
+export EIGENSDK=/usr/local/include/eigen3/
 
 export PATH=${GMSHSDK}/bin:${GMSHSDK}/lib:"${PATH}"
 export INCLUDE=${GMSHSDK}/include:"${INCLUDE}"
 export INCLUDE=${SOLSDK}:"${INCLUDE}"
+export INCLUDE=${EIGENSDK}:"${INCLUDE}"
 export LIB=${GMSHSDK}/lib:"${LIB}"
 export PYTHONPATH=${GMSHSDK}/lib:"${PYTHONPATH}"
 export DYLD_LIBRARY_PATH=${GMSHSDK}/lib:"${DYLD_LIBRARY_PATH}"
