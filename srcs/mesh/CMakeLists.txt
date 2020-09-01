@@ -15,3 +15,10 @@ TARGET_INCLUDE_DIRECTORIES(pfemMesh SYSTEM
                            PUBLIC ${CMAKE_CURRENT_BINARY_DIR}
                            PRIVATE ${GMSH_INCLUDE_DIRS})
 TARGET_LINK_LIBRARIES(pfemMesh PRIVATE CGAL::CGAL ${GMSH_LIBRARIES})
+IF(CMAKE_CXX_COMPILER_ID MATCHES GNU)
+    TARGET_COMPILE_OPTIONS(pfemMesh PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
+ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES CLANG)
+    TARGET_COMPILE_OPTIONS(pfemMesh PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wnull-dereference -Wshadow)
+ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+    TARGET_COMPILE_OPTIONS(pfemMesh PRIVATE /W4 /WX /wd4251)
+ENDIF()
