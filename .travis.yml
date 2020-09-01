@@ -48,7 +48,7 @@ install:
         ./genCBproject.sh;
         cd ../../;
     elif [ $TRAVIS_OS_NAME == osx ]; then 
-        brew update && brew update cmake && brew install wget gnu-tar llvm libomp unzip swig cgal lua python@3.7 nlohmann-json eigen;
+        brew update && brew upgrade cmake && brew install wget gnu-tar llvm libomp unzip swig cgal lua python@3.7 nlohmann-json eigen;
         cd run/macos;
         ./genCBproject.sh;
         cd ../../;

@@ -6,13 +6,52 @@
 #mingw-w64-x86_64-eigen3
 #mingw-w64-x86_64-nlohmann-json
 #https://github.com/CGAL/cgal/releases/download/releases%2FCGAL-5.0.2/CGAL-5.0.2-Setup.exe (CGAL .cmake from MSYS2 bugged)
-#After creating the build file you should run "grep -r C:/building" in the build directory and
-#replace every "C:/building" by by the directory where msys64 directory is
-#Please lauch buildCGAL.sh once to build CGAL 5.0 as shared lib
+#Please use buildCGAL.sh If you want to use cgal as a shared lib (recommanded for build time)
 
 export HERE=$PWD
 
 cd /c/tools
+
+export HERE_TOOLS=$PWD
+if [ ! -d "cgal-releases-CGAL-5.0.3" ]; then
+    wget https://github.com/CGAL/cgal/archive/releases/CGAL-5.0.3.tar.gz
+    tar -xf CGAL-5.0.3.tar.gz
+    rm -rf CGAL-5.0.3.tar.gz
+    cd $HERE_TOOLS
+fi
+
+IsShared="static"
+if [ ! -z "$1" ]; then
+	IsShared="$1"
+fi
+
+if [ "$IsShared" != "static" ] && [ "$IsShared" != "shared" ]; then
+    echo "Unknown lib type"
+	echo "$IsShared"
+	exit 1
+fi
+
+buildType="Release"
+if [ ! -z "$2" ]; then
+	buildType="$2"
+fi
+
+if [ "$buildType" != "Release" ] && [ "$buildType" != "Debug" ]; then
+    echo "Unknown build type"
+	echo "$buildTYpe"
+	exit 1
+fi
+
+if [ "$IsShared" = "shared" ] && [ ! -d  "/c/tools/CGAL-5.0.3/" ]; then
+	cd /c/tools/cgal-releases-CGAL-5.0.3
+	rm -rf build
+	mkdir build
+	cd build
+	cmake -G "MinGW Makefiles" -DCGAL_HEADER_ONLY=OFF -DCMAKE_INSTALL_PREFIX="/c/tools/CGAL-5.0.3/" -DCMAKE_BUILD_TYPE="${buildType}" .. 
+	mingw32-make
+	mingw32-make install
+    cd $HERE_TOOLS
+fi
 
 if [ ! -d "sol3" ]; then
   mkdir sol3
@@ -28,7 +67,11 @@ if [ ! -d "gmsh-4.6.0-Windows64-sdk" ]; then
   rm -rf gmsh-4.6.0-Linux64-sdk.tgz 
 fi
 
-export CGAL_DIR=/c/tools/CGAL-5.0.3
+if [ "$IsShared" = "shared" ]; then 
+	export CGAL_DIR=/c/tools/CGAL-5.0.3
+else
+	export CGAL_DIR=/c/tools/cgal-releases-CGAL-5.0.3
+fi
 export GMSHSDK=/c/tools/gmsh-4.6.0-Windows64-sdk #put gmsh sdk here
 export EIGENSDK=/c/tools/msys64/mingw64/include/eigen3
 export SOL3SDK=/c/tools/
@@ -45,7 +88,12 @@ rm -rf build
 mkdir build
 cd build
 
-cmake -G "CodeBlocks - MinGW Makefiles" -DCGAL_HEADER_ONLY=OFF -DUSE_MARCH=1 -DCMAKE_SH=SH-NOTFOUND  ..
+if [ "$IsShared" = "shared" ]; then 
+	cmake -G "CodeBlocks - MinGW Makefiles" -DCGAL_HEADER_ONLY=OFF -DUSE_MARCH=0 -DCMAKE_SH=SH-NOTFOUND  ..
+else
+	cmake -G "CodeBlocks - MinGW Makefiles" -DCGAL_HEADER_ONLY=ON -DUSE_MARCH=0 -DCMAKE_SH=SH-NOTFOUND  ..
+fi
+
 cp -r ${GMSHSDK}/lib/gmsh-4.6.dll bin
 cp -r ../run/windows/start.bat bin
 cp -r /c/tools/msys64/mingw64/bin/libgcc_s_seh-1.dll bin
@@ -54,7 +102,10 @@ cp -r /c/tools/msys64/mingw64/bin/libgmpxx-4.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libgomp-1.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libstdc++-6.dll bin
 cp -r /c/tools/msys64/mingw64/bin/libwinpthread-1.dll bin
-cp -r /c/tools/CGAL-5.0.2/bin/libCGAL.dll bin
+if [ "$IsShared" = "shared" ]; then 
+	cp -r /c/tools/CGAL-5.0.3/bin/libCGAL.dll bin
+fi
+
 cp -r /c/tools/msys64/mingw64/bin/lua53.dll bin
 
 cd ../
