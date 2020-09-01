@@ -39,18 +39,18 @@ before_cache:
 cache:
     directories:
     - $HOME/AppData/Local/Temp/chocolatey
-    - /C/tools/msys64 
+    - /C/tools/
    
 install:
   - if [ $TRAVIS_OS_NAME == linux ]; then 
         sudo apt-get update && sudo apt-get install -y cmake wget tar libgmsh-dev libcgal-dev liblua5.3-dev libpython3-dev swig4.0;
         cd run/linux;
-        ./genCBProject.sh;
+        ./genCBproject.sh;
         cd ../../;
     elif [ $TRAVIS_OS_NAME == osx ]; then 
         brew update && brew install cmake wget gnu-tar llvm libomp unzip swig cgal lua python@3.7 nlohmann-json eigen;
         cd run/macos;
-        ./genCBProject.sh;
+        ./genCBproject.sh;
         cd ../../;
     elif [ $TRAVIS_OS_NAME == windows ]; then 
         cd run/windows;
@@ -60,6 +60,7 @@ install:
     fi 
 
 script:
+  - cd build;
   - if [ $TRAVIS_OS_NAME == linux ]; then
         make;
     elif [ $TRAVIS_OS_NAME == osx ]; then
