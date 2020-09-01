@@ -56,6 +56,7 @@ install:
         cd /run/windows
         ./buildCGAL_MSYS2.sh
         ./genCBprojectMSYS2.sh
+        cd ../../
     fi 
 
 script:
