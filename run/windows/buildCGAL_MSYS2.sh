@@ -9,15 +9,26 @@
 #After creating the build file you should run "grep -r C:/building" in the build directory and
 #replace every "C:/building" by by the directory where msys64 directory is
 
-rm -rf /c/tools/CGAL-5.0.2
+export HERE=$PWD
+if [ ! -d "/c/tools/CGAL-5.0.3" ]; then
+    mkdir /c/dev/
+    cd /c/dev
+    wget https://github.com/CGAL/cgal/archive/releases/CGAL-5.0.3.tar.gz
+    tar -xf CGAL-5.0.3.tar.gz
+    rm -rf CGAL-5.0.3.tar.gz
+    cd $HERE
+fi
+
+rm -rf /c/tools/CGAL-5.0.3
 buildType="Release"
 if [ ! -z "$1" ]; then
 	buildType="$1"
 fi
-cd /c/dev/CGAL-5.0.2
+cd /c/dev/CGAL-5.0.3
 rm -rf build
 mkdir build
 cd build
-cmake -G "MinGW Makefiles" -DCGAL_HEADER_ONLY=OFF -DCMAKE_INSTALL_PREFIX="/c/tools/CGAL-5.0.2/" -DCMAKE_BUILD_TYPE="${buildType}" .. 
+cmake -G "MinGW Makefiles" -DCGAL_HEADER_ONLY=OFF -DCMAKE_INSTALL_PREFIX="/c/tools/CGAL-5.0.3/" -DCMAKE_BUILD_TYPE="${buildType}" .. 
 mingw32-make
 mingw32-make install
+cd $HERE
