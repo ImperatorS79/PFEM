@@ -5,9 +5,15 @@
 
 
 Solver::Solver(const SolverCreateInfo& solverInfos) :
-m_gravity(solverInfos.gravity), m_strongPAtFS(solverInfos.strongPAtFS), m_adaptDT(solverInfos.adaptDT),
-m_currentDT(solverInfos.initialDT), m_currentStep(0), m_currentTime(0), m_endTime(solverInfos.endTime),
-m_maxDT(solverInfos.maxDT), m_mesh(solverInfos.meshInfos), m_hasGMSHExtractor(false)
+m_gravity(solverInfos.gravity),
+m_strongPAtFS(solverInfos.strongPAtFS),
+m_adaptDT(solverInfos.adaptDT),
+m_currentDT(solverInfos.initialDT),
+m_currentStep(0), m_currentTime(0),
+m_endTime(solverInfos.endTime),
+m_maxDT(solverInfos.maxDT),
+m_mesh(solverInfos.meshInfos),
+m_hasGMSHExtractor(false)
 {
     m_solverType = SOLVER_TYPE::Undefined;
 
