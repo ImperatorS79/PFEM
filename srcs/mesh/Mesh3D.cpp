@@ -60,7 +60,7 @@ void Mesh::triangulateAlphaShape3D()
             IndexType in0 = cell->vertex(0)->info();
             IndexType in1 = cell->vertex(1)->info();
             IndexType in2 = cell->vertex(2)->info();
-            IndexType in3 = cell->vertex(2)->info();
+            IndexType in3 = cell->vertex(3)->info();
 
             element.nodesIndexes = {in0, in1, in2, in3};
 
