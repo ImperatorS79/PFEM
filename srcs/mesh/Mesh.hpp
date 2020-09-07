@@ -263,8 +263,6 @@ class MESH_API Mesh
          * \return true if at least one node was deleted, false otherwise.
          */
         bool checkBoundingBox(bool verboseOutput) noexcept;
-        bool checkBoundingBoxOld(bool verboseOutput) noexcept;
-
 
         /**
          * \brief Compute the determinant of the of the Jacobian matrix for gauss

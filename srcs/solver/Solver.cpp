@@ -79,6 +79,9 @@ void Solver::setInitialCondition()
         std::pair<std::vector<double>, bool> result;
         result = m_lua[std::string("init") + m_mesh.getNodeType(n)](m_mesh.getNodePosition(n)).get<std::pair<std::vector<double>, bool>>();
 
+        if(result.first.size() != m_statesNumber)
+            throw std::runtime_error("Your initial condition does not set the right number of state!");
+
         for(unsigned short i = 0 ; i < m_statesNumber ; ++i)
         {
             m_mesh.setNodeState(n, i, result.first[i]);

@@ -1,20 +1,10 @@
 #include "Mesh.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <fstream>
 #include <iostream>
 
 #include <gmsh.h>
-
-using Clock = std::chrono::high_resolution_clock;
-using TimeType = std::chrono::time_point<std::chrono::high_resolution_clock>;
-
-static void displayDT(TimeType startTime, TimeType endTime, std::string text)
-{
-    auto ellapsedTimeMeasure = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    std::cout << text << static_cast<double>(ellapsedTimeMeasure.count())/1000.0 << " s" << std::endl;
-}
 
 
 Mesh::Mesh(const MeshCreateInfo& meshInfos) :
@@ -150,58 +140,6 @@ bool Mesh::addNodes(bool verboseOutput) noexcept
     return addedNodes;
 }
 
-bool Mesh::checkBoundingBoxOld(bool verboseOutput) noexcept
-{
-    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
-
-    std::vector<bool> toBeDeleted(m_nodesList.size(), false);   //Should the node be deleted
-
-    bool outofBBNodes = false;
-
-    for(IndexType n = 0 ; n < m_nodesList.size() ; ++n)
-    {
-        //If the node is out of the bounding box, we delete it.
-        // Bounding box fromat: [xmin, ymin, zmin, xmax, ymax, zmax]
-        for(unsigned short d = 0 ; d < m_dim ; ++d)
-        {
-            if(m_nodesList[n].position[d] < m_boundingBox[d] ||
-               m_nodesList[n].position[d] > m_boundingBox[d + m_dim])
-            {
-                toBeDeleted[n] = true;
-                outofBBNodes = true;
-                break;
-            }
-        }
-    }
-
-    m_nodesList.erase(
-    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeleted, verboseOutput](const Node& node)
-    {
-       if(toBeDeleted[&node - &*std::begin(m_nodesList)])
-       {
-           if(verboseOutput)
-           {
-               std::cout << "Removing out of bounding box node (";
-                for(unsigned short d = 0 ; d < m_dim ; ++d)
-                {
-                    std::cout << node.position[d];
-                    if(d == m_dim - 1)
-                        std::cout << ")";
-                    else
-                        std::cout << ", ";
-                }
-                std::cout << std::endl;
-           }
-
-           return true;
-       }
-       else
-           return false;
-    }), m_nodesList.end());
-
-    return outofBBNodes;
-}
-
 bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
@@ -275,7 +213,6 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
                     else
                         std::cout << ", ";
                 }
-
                 std::cout << std::endl;
             }
 
@@ -688,31 +625,10 @@ void Mesh::loadFromFile(const std::string& fileName)
 
 void Mesh::remesh(bool verboseOutput)
 {
-    TimeType startTime, endTime;
-
-    startTime = Clock::now();
     checkBoundingBox(verboseOutput);
-    endTime = Clock::now();
-    if(verboseOutput)
-        displayDT(startTime, endTime, "Check bounding box in: ");
-
-    startTime = Clock::now();
     addNodes(verboseOutput);
-    endTime = Clock::now();
-    if(verboseOutput)
-        displayDT(startTime, endTime, "Added nodes in: ");
-
-    startTime = Clock::now();
     removeNodes(verboseOutput);
-    endTime = Clock::now();
-    if(verboseOutput)
-        displayDT(startTime, endTime, "Removed nodes in: ");
-
-    startTime = Clock::now();
     triangulateAlphaShape();
-    endTime = Clock::now();
-    if(verboseOutput)
-        displayDT(startTime, endTime, "Triangulate in: ");
 }
 
 bool Mesh::removeNodes(bool verboseOutput) noexcept
