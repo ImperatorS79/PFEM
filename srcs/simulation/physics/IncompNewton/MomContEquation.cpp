@@ -495,5 +495,5 @@ double MomContEqIncompNewton::m_computeTauPSPG(const Element& element) const
     U /= (m_pMesh->getDim() + 1);
 
     return 1/std::sqrt((2/m_pSolver->getTimeStep())*(2/m_pSolver->getTimeStep()) + (2*U/h)*(2*U/h)
-                        + (4*m_mu/(h*h*m_rho))*(4*m_mu/(h*h*m_rho)));
+                        + 9*(4*m_mu/(h*h*m_rho))*(4*m_mu/(h*h*m_rho)));
 }
