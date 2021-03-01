@@ -278,3 +278,15 @@ bool Element::isContact() const noexcept
     return false;
 }
 
+bool Element::isOnFS() const noexcept
+{
+    for(std::size_t i = 0 ; i < m_nodesIndexes.size() ; ++i)
+    {
+        const Node& node = m_pMesh->getNode(m_nodesIndexes[i]);
+        if(node.isOnFreeSurface())
+            return true;
+    }
+
+    return false;
+}
+

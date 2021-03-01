@@ -90,6 +90,9 @@ class MESH_API Element
         /// \return Is the element near a boundary?
         bool isContact() const noexcept;
 
+        /// \return Is the element on the free surface?
+        bool isOnFS() const noexcept;
+
         friend inline bool operator==(const Element& a, const Element& b) noexcept;
 
         Element& operator=(const Element& element)   = default;
