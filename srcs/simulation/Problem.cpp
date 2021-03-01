@@ -75,6 +75,14 @@ void Problem::displayParams() const
     throw std::runtime_error("Unimplemented function by the child class -> Problem::displayParams()");
 }
 
+void Problem::dump()
+{
+    for(auto& pExtractor : m_pExtractors)
+    {
+        pExtractor->update(true);
+    }
+}
+
 std::string Problem::getID() const noexcept
 {
     return m_id;

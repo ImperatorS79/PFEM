@@ -53,11 +53,13 @@ int main(int argc, char **argv)
     catch(const std::exception& e)
     {
         std::cerr << "Something went wrong while running the program: " << e.what() << std::endl;
+        pProblem->dump();
         return -1;
     }
     catch(...)
     {
         std::cerr << "An unknown exception has occurred." << std::endl;
+        pProblem->dump();
         return -1;
     }
 
