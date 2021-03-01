@@ -23,14 +23,15 @@ MassExtractor::~MassExtractor()
     m_outFile.close();
 }
 
-void MassExtractor::update()
+void MassExtractor::update(bool force)
 {
-    if(m_pProblem->getCurrentSimTime() < m_nextWriteTrigger)
+    if(m_pProblem->getCurrentSimTime() < m_nextWriteTrigger && !force)
         return;
 
     double valueToWrite = m_pProblem->getGlobalWrittableData(std::string("mass"));
 
     m_outFile << std::to_string(m_pProblem->getCurrentSimTime()) << "," << std::to_string(valueToWrite) << std::endl;
 
-    m_nextWriteTrigger += m_timeBetweenWriting;
+    if(!force)
+        m_nextWriteTrigger += m_timeBetweenWriting;
 }

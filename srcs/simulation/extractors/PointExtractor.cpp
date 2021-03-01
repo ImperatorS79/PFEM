@@ -30,9 +30,9 @@ PointExtractor::~PointExtractor()
     m_outFile.close();
 }
 
-void PointExtractor::update()
+void PointExtractor::update(bool force)
 {
-    if(m_pProblem->getCurrentSimTime() < m_nextWriteTrigger)
+    if(m_pProblem->getCurrentSimTime() < m_nextWriteTrigger && !force)
         return;
 
     const Mesh& mesh = m_pProblem->getMesh();
@@ -101,7 +101,8 @@ void PointExtractor::update()
 
     m_outFile << std::endl;
 
-    m_nextWriteTrigger += m_timeBetweenWriting;
+    if(!force)
+        m_nextWriteTrigger += m_timeBetweenWriting;
 }
 
 bool PointExtractor::findElementIndex(const Mesh& mesh, std::size_t& elementIndex, const std::vector<double>& point)

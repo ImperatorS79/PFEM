@@ -16,7 +16,8 @@ Extractor::~Extractor()
 {
 }
 
-void Extractor::update()
+void Extractor::update(bool force)
 {
+    (void) force;
     throw std::runtime_error("Extractor base class is useless ^^!");
 }

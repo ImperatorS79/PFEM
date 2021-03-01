@@ -272,7 +272,7 @@ void Problem::simulate()
 
     for(auto& pExtractor : m_pExtractors)
     {
-        pExtractor->update();
+        pExtractor->update(false);
     }
 
     while(m_time < m_maxTime)
@@ -302,7 +302,7 @@ void Problem::simulate()
         {
             for(auto& pExtractor : m_pExtractors)
             {
-                pExtractor->update();
+                pExtractor->update(false);
             }
         }
 

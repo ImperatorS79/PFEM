@@ -30,7 +30,7 @@ class SIMULATION_API GMSHExtractor : public Extractor
         ~GMSHExtractor() override;
 
         /// Update the extractor state and write data if necessary
-        void update() override;
+        void update(bool force) override;
 
     private:
         std::vector<std::string> m_whatToWrite;

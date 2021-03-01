@@ -18,7 +18,7 @@ class SIMULATION_API MinMaxExtractor : public Extractor
         MinMaxExtractor& operator=(MinMaxExtractor&& minmaxExtractor)      = delete;
         ~MinMaxExtractor() override;
 
-        void update() override;
+        void update(bool force) override;
 
     private:
         std::ofstream m_outFile;

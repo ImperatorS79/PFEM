@@ -29,7 +29,7 @@ class SIMULATION_API Extractor
         virtual ~Extractor();
 
         /// Update the extractor state and write data if necessary
-        virtual void update();
+        virtual void update(bool force);
 
     protected:
         Problem* m_pProblem;

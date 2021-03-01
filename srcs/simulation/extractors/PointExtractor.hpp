@@ -21,7 +21,7 @@ class SIMULATION_API PointExtractor : public Extractor
         PointExtractor& operator=(PointExtractor&& pointExtractor)      = delete;
         ~PointExtractor() override;
 
-        void update() override;
+        void update(bool force) override;
 
     private:
         std::ofstream m_outFile;

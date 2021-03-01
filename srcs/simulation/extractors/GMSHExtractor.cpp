@@ -54,9 +54,9 @@ GMSHExtractor::~GMSHExtractor()
     m_initialized--;
 }
 
-void GMSHExtractor::update()
+void GMSHExtractor::update(bool force)
 {
-    if(m_pProblem->getCurrentSimTime() < m_nextWriteTrigger)
+    if(m_pProblem->getCurrentSimTime() < m_nextWriteTrigger && !force)
         return;
 
     const Mesh& mesh = m_pProblem->getMesh();
@@ -173,5 +173,6 @@ void GMSHExtractor::update()
 
     gmsh::model::remove();
 
-    m_nextWriteTrigger += m_timeBetweenWriting;
+    if(!force)
+        m_nextWriteTrigger += m_timeBetweenWriting;
 }

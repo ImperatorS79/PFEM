@@ -17,7 +17,7 @@ class SIMULATION_API MassExtractor : public Extractor
         MassExtractor& operator=(MassExtractor&& massExtractor)      = delete;
         ~MassExtractor() override;
 
-        void update() override;
+        void update(bool force) override;
 
     private:
         std::ofstream m_outFile;
