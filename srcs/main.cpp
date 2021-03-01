@@ -6,6 +6,8 @@
 #include "simulation/physics/Problems.hpp"
 #include "simulation/utility/Utility.hpp"
 #include "simulation/utility/SolTable.hpp"
+#include "simulation/utility/Clock.hpp"
+
 
 /**
  * \param  argv[1] .lua file that contains the parameters.
@@ -17,6 +19,9 @@ int main(int argc, char **argv)
         std::cerr   << "Usage: " << argv[0] << " params.lua" <<  std::endl;
         return 1;
     }
+
+    Clock myClock;
+    myClock.start();
 
     std::unique_ptr<Problem> pProblem;
 
@@ -55,6 +60,9 @@ int main(int argc, char **argv)
         std::cerr << "An unknown exception has occurred." << std::endl;
         return -1;
     }
+
+    myClock.end();
+    myClock.displayDT("Ellapsed time for simulation: ");
 
     return 0;
 }
