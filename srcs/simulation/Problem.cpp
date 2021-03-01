@@ -11,11 +11,16 @@
 #include "Solver.hpp"
 #include "extractors/Extractors.hpp"
 #include "../mesh/Mesh.hpp"
+#include "utility/SignalHandler.h"
+
+int g_shouldClose = 0;
 
 Problem::Problem(const std::string& luaFilePath):
 m_time(0),
 m_step(0)
 {
+    signal(SIGINT, signalHandler);
+
     std::cout   << "================================================================"
                 << "\n"
                 << "                        LOADING PROBLEM                         "
@@ -312,6 +317,16 @@ void Problem::simulate()
             {
                 pExtractor->update(false);
             }
+        }
+
+        if(g_shouldClose == 1)
+        {
+            for(auto& pExtractor : m_pExtractors)
+            {
+                pExtractor->update(true);
+            }
+
+            break;
         }
 
         m_pSolver->computeNextDT();
