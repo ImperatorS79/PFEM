@@ -70,6 +70,9 @@ class SIMULATION_API Problem
         inline unsigned int getThreadCount() const noexcept;
         inline bool isOutputVerbose() const noexcept;
 
+        /// \brief Write all extractor data.
+        void dump();
+
         /// \brief This function simulate the problem from t = 0 to t = t_max
         void simulate();
 
