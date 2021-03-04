@@ -35,7 +35,7 @@ Problem = {
 	},
 	
 	Solver = {
-	    id = "CDS",
+	    id = "CDS_Meduri",
 		adaptDT = true,
 		maxDT = 0.008,
 		initialDT = 1e-8,
@@ -50,6 +50,7 @@ Problem = {
 		
 		ContEq = {
 			strongContinuity = false,
+			enableStab = true,
 			BC = {
 
 			}

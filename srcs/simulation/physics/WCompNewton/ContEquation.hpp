@@ -30,6 +30,7 @@ class SIMULATION_API ContEqWCompNewton : public Equation
         double m_K0p;
         double m_rhoStar;
         bool m_strongContinuity;
+        bool m_enableStab;
         double m_keStab;
 
         Eigen::VectorXd m_F0;

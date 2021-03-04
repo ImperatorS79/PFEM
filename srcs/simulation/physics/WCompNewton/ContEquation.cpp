@@ -12,6 +12,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     m_K0p = m_materialParams[0].checkAndGet<double>("K0p");
     m_rhoStar = m_materialParams[0].checkAndGet<double>("rhoStar");
     m_strongContinuity = m_equationParams[0].checkAndGet<bool>("strongContinuity");
+    m_enableStab = m_equationParams[0].checkAndGet<bool>("enableStab");
 
     Eigen::VectorXd m;
     if(m_pMesh->getDim() == 2)
@@ -175,7 +176,12 @@ void ContEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynami
             Eigen::MatrixXd Be = m_pMatBuilder->getB(gradNe);
             Eigen::MatrixXd Drhoe = m_pMatBuilder->getD(element, Be);
 
-            F0e[elm] = MeLumped[elm]*Rho - m_pSolver->getTimeStep()*Drhoe*V;
+            F0e[elm] = - m_pSolver->getTimeStep()*Drhoe*V;
+
+            if(m_enableStab)
+                F0e[elm] += Me*Rho;
+            else
+                F0e[elm] += MeLumped[elm]*Rho;
         }
     }
     Eigen::setNbThreads(m_pProblem->getThreadCount());

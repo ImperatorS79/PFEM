@@ -14,7 +14,7 @@ Solver(pProblem, pMesh, problemParams)
     if(m_pProblem->getID() != "WCompNewtonNoT" && m_pProblem->getID() != "BoussinesqWC")
         throw std::runtime_error("this solver cannot be used with problem whose id is " + m_pProblem->getID());
 
-    if(m_id != "CDS")
+    if(m_id != "CDS_Meduri")
         throw std::runtime_error("this solver does not know id " + m_id);
 
     //Load material params for equations
