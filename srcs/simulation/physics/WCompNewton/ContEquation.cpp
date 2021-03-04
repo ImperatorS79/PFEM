@@ -11,8 +11,14 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     m_K0 = m_materialParams[0].checkAndGet<double>("K0");
     m_K0p = m_materialParams[0].checkAndGet<double>("K0p");
     m_rhoStar = m_materialParams[0].checkAndGet<double>("rhoStar");
+    m_mu = m_materialParams[0].checkAndGet<double>("mu");
     m_strongContinuity = m_equationParams[0].checkAndGet<bool>("strongContinuity");
     m_enableStab = m_equationParams[0].checkAndGet<bool>("enableStab");
+    if(m_pProblem->getID() == "BoussinesqWC")
+    {
+        m_alpha = m_materialParams[0].checkAndGet<double>("alpha");
+        m_Tr = m_materialParams[0].checkAndGet<double>("Tr");
+    }
 
     Eigen::VectorXd m;
     if(m_pMesh->getDim() == 2)
@@ -27,8 +33,17 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     }
     m_pMatBuilder->setm(m);
 
-    if(m_statesIndex .size()!= 3)
-        throw std::runtime_error("the " + getID() + " equation requires 3 statesIndex: one index for the p unknown, one for the rho unknown, and one for the beginning of the (u,v,w) unknown!");
+    if(m_pProblem->getID() == "BoussinesqWC")
+    {
+        if(m_statesIndex.size()!= 4)
+            throw std::runtime_error("the " + getID() + " equation requires 4 statesIndex: one index for the p unknown, one for the rho unknown, one for the beginning of the (u,v,w) unknown, and the T unknown!");
+
+    }
+    else
+    {
+        if(m_statesIndex.size()!= 3)
+            throw std::runtime_error("the " + getID() + " equation requires 3 statesIndex: one index for the p unknown, one for the rho unknown, and one for the beginning of the (u,v,w) unknown!");
+    }
 
     m_pMatBuilder->setMcomputeFactor([&](const Element& /** element **/, const Eigen::MatrixXd& /** N **/) -> double {
         return 1;
@@ -210,11 +225,24 @@ Eigen::VectorXd ContEqWCompNewton::m_getPFromRhoTaitMurnagham(const Eigen::Vecto
 {
     Eigen::VectorXd qP(m_pMesh->getNodesCount());
 
-    #pragma omp parallel for default(shared)
-    for(std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n)
+    if(m_pProblem->getID() == "BoussinesqWC")
     {
-        double rho = qRho[n];
-        qP[n] = (m_K0/m_K0p)*(std::pow(rho/m_rhoStar, m_K0p) - 1);
+        #pragma omp parallel for default(shared)
+        for(std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n)
+        {
+            double rho = qRho[n];
+            double T = m_pMesh->getNode(n).getState(m_statesIndex[3]);
+            qP[n] = (m_K0/m_K0p)*(std::pow(rho/(m_rhoStar*(1 - m_alpha*(T - m_Tr))), m_K0p) - 1);
+        }
+    }
+    else
+    {
+        #pragma omp parallel for default(shared)
+        for(std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n)
+        {
+            double rho = qRho[n];
+            qP[n] = (m_K0/m_K0p)*(std::pow(rho/m_rhoStar, m_K0p) - 1);
+        }
     }
 
     return qP;

@@ -74,20 +74,9 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         return 1;
     });
 
-    if(m_pProblem->getID() == "BoussinesqWC")
-    {
-        m_pMatBuilder->setFcomputeFactor([&](const Element& element, const Eigen::MatrixXd&  N, const Eigen::MatrixXd& /** B **/) -> double {
-            double rho = (N*getElementState(m_pMesh, element, m_statesIndex[3])).value();
-            double T = (N*getElementState(m_pMesh, element, m_statesIndex[4])).value();
-            return rho*(1 - m_alpha*(T - m_Tr));
-        });
-    }
-    else
-    {
-        m_pMatBuilder->setFcomputeFactor([&](const Element& element, const Eigen::MatrixXd&  N, const Eigen::MatrixXd& /** B **/) -> double {
-            return (N*getElementState(m_pMesh, element, m_statesIndex[3])).value();
-        });
-    }
+    m_pMatBuilder->setFcomputeFactor([&](const Element& element, const Eigen::MatrixXd&  N, const Eigen::MatrixXd& /** B **/) -> double {
+        return (N*getElementState(m_pMesh, element, m_statesIndex[3])).value();
+    });
 
     auto bodyForce = m_equationParams[0].checkAndGet<std::vector<double>>("bodyForce");
     if(bodyForce.size() != m_pMesh->getDim())

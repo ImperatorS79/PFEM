@@ -70,7 +70,7 @@ Solver(pProblem, pMesh, problemParams)
         m_pEquations.resize(3);
 
         bcFlags = {0};
-		statesIndex = {dim, dim + 1, 0};
+		statesIndex = {dim, dim + 1, 0, 2*dim + 2};
 		m_pEquations[0] = std::make_unique<ContEqWCompNewton>(
 			m_pProblem, this, m_pMesh, m_solverParams, materialParams,
 			bcFlags, statesIndex

@@ -29,6 +29,9 @@ class SIMULATION_API ContEqWCompNewton : public Equation
         double m_K0;
         double m_K0p;
         double m_rhoStar;
+        double m_mu;
+        double m_alpha;
+        double m_Tr;
         bool m_strongContinuity;
         bool m_enableStab;
         double m_keStab;
