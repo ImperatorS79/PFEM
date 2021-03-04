@@ -13,7 +13,9 @@ m_nGPLD(nGPLD)
     m_gradsfsLD = m_mesh.getGradShapeFunctions(m_mesh.getDim() - 1);
 
     m_NHD.resize(m_nGPHD);
+    m_NhdTNhd.resize(m_nGPHD);
     m_NLD.resize(m_nGPLD);
+    m_NldTNld.resize(m_nGPLD);
     m_NHDtilde.resize(m_nGPHD);
     m_NLDtilde.resize(m_nGPLD);
 
@@ -89,6 +91,22 @@ m_nGPLD(nGPLD)
     m_gaussPointsHD = m_mesh.getGaussPoints(m_mesh.getDim(), m_nGPHD);
     m_gaussPointsLD = m_mesh.getGaussPoints(m_mesh.getDim() - 1, m_nGPLD);
     m_gaussWeightLD = m_mesh.getGaussWeight(m_mesh.getDim() - 1, m_nGPLD);
+
+    m_sum_NhdTNhd_w.resize(m_NHD[0].cols(), m_NHD[0].cols());
+    m_sum_NhdTNhd_w.setZero();
+    for(std::size_t i = 0 ; i < nGPHD ; ++i)
+    {
+        m_NhdTNhd[i] = m_NHD[i].transpose()*m_NHD[i];
+        m_sum_NhdTNhd_w += m_NhdTNhd[i]*m_gaussWeightHD[i];
+    }
+
+    m_sum_NldTNld_w.resize(m_NLD[0].cols(), m_NLD[0].cols());
+    m_sum_NldTNld_w.setZero();
+    for(std::size_t i = 0 ; i < nGPLD ; ++i)
+    {
+        m_NldTNld[i] = m_NLD[i].transpose()*m_NLD[i];
+        m_sum_NldTNld_w += m_NldTNld[i]*m_gaussWeightLD[i];
+    }
 }
 
 MatrixBuilder::~MatrixBuilder()
@@ -192,9 +210,9 @@ Eigen::MatrixXd MatrixBuilder::getM(const Element& element)
 
     Eigen::MatrixXd M(noPerEl, noPerEl); M.setZero();
 
-    for(unsigned int i = 0 ; i < m_NHD.size() ; ++ i)
+    for(unsigned int i = 0 ; i < m_NhdTNhd.size() ; ++ i)
     {
-        M += m_Mfunc(element, m_NHD[i])*m_NHD[i].transpose()*m_NHD[i]*m_gaussWeightHD[i];
+        M += m_Mfunc(element, m_NHD[i])*m_NhdTNhd[i]*m_gaussWeightHD[i];
     }
 
     M *= element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim());
@@ -208,9 +226,9 @@ Eigen::MatrixXd MatrixBuilder::getMGamma(const Facet& facet)
 
     Eigen::MatrixXd MGamma(noPerFacet, noPerFacet); MGamma.setZero();
 
-    for(unsigned int i = 0 ; i < m_NLD.size() ; ++ i)
+    for(unsigned int i = 0 ; i < m_NldTNld.size() ; ++ i)
     {
-        MGamma += m_MGammafunc(facet, m_NLD[i])*m_NLD[i].transpose()*m_NLD[i]*m_gaussWeightLD[i];
+        MGamma += m_MGammafunc(facet, m_NLD[i])*m_NldTNld[i]*m_gaussWeightLD[i];
     }
 
     MGamma *= facet.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim() - 1);
@@ -248,14 +266,15 @@ Eigen::MatrixXd MatrixBuilder::getK(const Element& element, const Eigen::MatrixX
     unsigned int noPerEl = m_mesh.getNodesPerElm();
     unsigned int dim = m_mesh.getDim();
 
-    Eigen::MatrixXd K(noPerEl*dim, noPerEl*dim); K.setZero();
+    Eigen::MatrixXd K(noPerEl*dim, noPerEl*dim);
+    double fact = 0;
 
     for(unsigned int i = 0 ; i < m_NHD.size() ; ++ i)
     {
-        K += m_Kfunc(element, m_NHD[i], B)*B.transpose()*m_ddev*B*m_gaussWeightHD[i];
+        fact += m_Kfunc(element, m_NHD[i], B)*m_gaussWeightHD[i];
     }
 
-    K *= element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim());
+    K = element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim())*fact*B.transpose()*m_ddev*B;
 
     return K;
 }
@@ -265,14 +284,15 @@ Eigen::MatrixXd MatrixBuilder::getD(const Element& element, const Eigen::MatrixX
     unsigned int noPerEl = m_mesh.getNodesPerElm();
     unsigned int dim = m_mesh.getDim();
 
-    Eigen::MatrixXd D(noPerEl, noPerEl*dim); D.setZero();
+    Eigen::MatrixXd D(noPerEl, noPerEl*dim);
+    Eigen::MatrixXd sumWNT(noPerEl, 1); sumWNT.setZero();
 
     for(unsigned int i = 0 ; i < m_NHD.size() ; ++ i)
     {
-        D += m_Dfunc(element, m_NHD[i], B)*m_NHD[i].transpose()*m_m.transpose()*B*m_gaussWeightHD[i];
+        sumWNT += m_Dfunc(element, m_NHD[i], B)*m_NHD[i].transpose()*m_gaussWeightHD[i];
     }
 
-    D *= element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim());
+    D = element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim())*sumWNT*m_m.transpose()*B;
 
     return D;
 }
@@ -281,14 +301,15 @@ Eigen::MatrixXd MatrixBuilder::getL(const Element& element, const Eigen::MatrixX
 {
     unsigned int noPerEl = m_mesh.getNodesPerElm();
 
-    Eigen::MatrixXd L(noPerEl, noPerEl); L.setZero();
+    Eigen::MatrixXd L(noPerEl, noPerEl);
+    double fact = 0;
 
     for(unsigned int i = 0 ; i < m_NHD.size() ; ++ i)
     {
-        L += m_Lfunc(element, m_NHD[i], B)*gradN.transpose()*gradN*m_gaussWeightHD[i];
+        fact += m_Lfunc(element, m_NHD[i], B)*m_gaussWeightHD[i];
     }
 
-    L *= element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim());
+    L = element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim())*fact*gradN.transpose()*gradN;
 
     return L;
 }
@@ -298,14 +319,15 @@ Eigen::MatrixXd MatrixBuilder::getC(const Element& element, const Eigen::MatrixX
     unsigned int noPerEl = m_mesh.getNodesPerElm();
     unsigned int dim = m_mesh.getDim();
 
-    Eigen::MatrixXd C(noPerEl, noPerEl*dim); C.setZero();
+    Eigen::MatrixXd C(noPerEl, noPerEl*dim);
+    Eigen::MatrixXd sumNW(dim, noPerEl*dim); sumNW.setZero();
 
     for(unsigned int i = 0 ; i < m_NHD.size() ; ++ i)
     {
-        C += m_Cfunc(element, m_NHD[i], B)*gradN.transpose()*m_NHDtilde[i]*m_gaussWeightHD[i];
+        sumNW += m_Cfunc(element, m_NHD[i], B)*m_NHDtilde[i]*m_gaussWeightHD[i];
     }
 
-    C *= element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim());
+    C = element.getDetJ()*m_mesh.getRefElementSize(m_mesh.getDim())*gradN.transpose()*sumNW;
 
     return C;
 }

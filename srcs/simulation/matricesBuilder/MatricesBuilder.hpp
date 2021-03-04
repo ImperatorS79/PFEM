@@ -124,7 +124,11 @@ class MatrixBuilder
         std::vector<std::vector<double>> m_gradsfsLD; /**< Element gradient of shape functions for facets (constant). **/
 
         std::vector<Eigen::MatrixXd> m_NHD;
+        std::vector<Eigen::MatrixXd> m_NhdTNhd;
+        Eigen::MatrixXd m_sum_NhdTNhd_w;
         std::vector<Eigen::MatrixXd> m_NLD;
+        std::vector<Eigen::MatrixXd> m_NldTNld;
+        Eigen::MatrixXd m_sum_NldTNld_w;
         std::vector<Eigen::MatrixXd> m_NHDtilde;
         std::vector<Eigen::MatrixXd> m_NLDtilde;
 
