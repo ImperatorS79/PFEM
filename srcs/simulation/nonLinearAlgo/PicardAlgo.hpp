@@ -3,9 +3,17 @@
 #define PICARDALGO_HPP_INCLUDED
 
 #include <functional>
-#include <Eigen/SparseLU>
+#include <Eigen/IterativeLinearSolvers>
+#ifdef EIGEN_USE_MKL_ALL
+    #include <Eigen/PardisoSupport>
+    typedef Eigen::PardisoLU<Eigen::SparseMatrix<double>> EigenSparseSolver;
+#else
+    #include <Eigen/SparseLU>
+    typedef Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> EigenSparseSolver;
+#endif
 
 #include "NonLinearAlgo.hpp"
+
 
 /**
  * \class PicardAlgo
@@ -32,7 +40,7 @@ class PicardAlgo : public NonLinearAlgo
         unsigned int m_maxIter;
         double m_minRes;
 
-        Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> m_solver;
+        EigenSparseSolver m_solver;
 };
 
 #endif // PICARDALGO_HPP_INCLUDED

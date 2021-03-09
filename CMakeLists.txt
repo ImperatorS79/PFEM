@@ -4,7 +4,15 @@ cmake_minimum_required(VERSION 3.13)
 
 project(PFEM VERSION 1.0
              DESCRIPTION "A Particle Finite Element Method solver for various problems."
-             LANGUAGES CXX)
+             LANGUAGES CXX C)
+
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake")
+
+option(USE_MKL_WITH_TBB "Use MKL with TBB" OFF)
+SET(USE_MKL_WITH_TBB OFF CACHE BOOL "" FORCE)
+if(USE_MKL_WITH_TBB AND (MINGW OR MSYS))
+    message(FATAL_ERROR "Unfortunately MKL cannot be used with mingw :/.")
+endif()
 
 # build type is "" by default in Linux
 if(NOT CMAKE_BUILD_TYPE)
