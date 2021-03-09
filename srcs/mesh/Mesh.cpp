@@ -14,6 +14,8 @@ m_alpha(meshInfos.alpha),
 m_omega(meshInfos.omega),
 m_gamma(meshInfos.gamma),
 m_boundingBox(meshInfos.boundingBox),
+m_addOnFS(meshInfos.addOnFS),
+m_deleteFlyingNodes(meshInfos.deleteFlyingNodes),
 m_computeNormalCurvature(true)
 {
     loadFromFile(meshInfos.mshFile);
@@ -34,7 +36,7 @@ bool Mesh::addNodes(bool verboseOutput)
     for(std::size_t elm = 0 ; elm < elementCount ; ++elm)
     {
         //If an element is too big, we add a node at his center
-        if(m_elementsList[elm].getSize() > limitSize)
+        if(m_elementsList[elm].getSize() > limitSize && (m_addOnFS ? true : !m_elementsList[elm].isOnFS()))
         {
             Node newNode(*this);
 
@@ -332,6 +334,88 @@ void Mesh::computeFSNormalCurvature()
 
             computeFSNormalCurvature3D();
             break;
+    }
+}
+
+void Mesh::deleteFlyingNodes(bool verboseOutput) noexcept
+{
+    assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
+
+    std::vector<bool> toBeDeletedNodes(m_nodesList.size(), false);   //Should the node be deleted
+
+	std::size_t nodesToDeleteCount = 0;
+    std::vector<std::size_t> nodesIndexesDeleted = {};
+
+    //If the whole element is out of the bounding box, we delete it.
+    // Bounding box fromat: [xmin, ymin, zmin, xmax, ymax, zmax]
+    for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
+    {
+        if(m_nodesList[n].isFree() && !m_nodesList[n].isBound())
+        {
+            toBeDeletedNodes[n] = true;
+			nodesToDeleteCount++;
+        }
+    }
+
+	nodesIndexesDeleted.resize(nodesToDeleteCount);
+	std::size_t count = 0;
+    for(std::size_t n = 0 ; n < toBeDeletedNodes.size() ; ++n)
+    {
+		if(toBeDeletedNodes[n])
+		{
+			nodesIndexesDeleted[count] = n;
+			count++;
+		}
+	}
+
+
+    m_nodesList.erase(
+    std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeletedNodes, verboseOutput](const Node& node)
+    {
+        if(toBeDeletedNodes[&node - &*std::begin(m_nodesList)])
+        {
+            if(verboseOutput)
+            {
+                std::cout << "Removing free node (";
+                for(unsigned short d = 0 ; d < m_dim ; ++d)
+                {
+                    std::cout << node.m_position[d];
+                    if(d == m_dim - 1)
+                        std::cout << ")";
+                    else
+                        std::cout << ", ";
+                }
+                std::cout << std::endl;
+            }
+
+            return true;
+        }
+        else
+           return false;
+    }), m_nodesList.end());
+
+    for(std::size_t i = 0 ; i < nodesIndexesDeleted.size() ; ++i)
+    {
+        for(Element& element : m_elementsList)
+        {
+            for(std::size_t& n : element.m_nodesIndexes)
+            {
+                if(n > nodesIndexesDeleted[i])
+                    n--;
+            }
+        }
+
+        for(Node& node : m_nodesList)
+        {
+            for(std::size_t& n : node.m_neighbourNodes)
+            {
+                if(n > nodesIndexesDeleted[i])
+                    n--;
+            }
+        }
+
+        for(std::size_t j = i + 1 ; j < nodesIndexesDeleted.size() ; ++j)
+            nodesIndexesDeleted[j]--;
     }
 }
 

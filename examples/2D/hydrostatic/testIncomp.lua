@@ -8,6 +8,8 @@ Problem = {
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
+		addOnFS = true,
+		deleteFlyingNodes = false,
 		boundingBox = {-2, -1, 12, 100},
 		mshFile = "examples/2D/hydrostatic/geometry.msh"
 	},

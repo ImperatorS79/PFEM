@@ -8,6 +8,8 @@ Problem = {
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
+		addOnFS = true,
+		deleteFlyingNodes = false,
 		boundingBox = {-0.05, -0.05, 1.05, 1.05},
 		mshFile = "examples/2D/thermalConv/geometry.msh"
 	},

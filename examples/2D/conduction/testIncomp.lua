@@ -8,6 +8,8 @@ Problem = {
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
+		addOnFS = true,
+		deleteFlyingNodes = false,
 		boundingBox = {-1, -0.25, 5, 1.25},
 		mshFile = "examples/2D/conduction/geometry.msh"
 	},

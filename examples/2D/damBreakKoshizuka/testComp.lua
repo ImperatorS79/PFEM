@@ -8,6 +8,8 @@ Problem = {
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
+		addOnFS = true,
+		deleteFlyingNodes = false,
 		boundingBox = {-0.01, -0.01, 0.594, 100},
 		mshFile = "examples/2D/damBreakKoshizuka/geometry.msh"
 	},

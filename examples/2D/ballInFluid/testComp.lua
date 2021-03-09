@@ -8,6 +8,8 @@ Problem = {
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.6,
+		addOnFS = true,
+		deleteFlyingNodes = false,
 		boundingBox = {-0.05, -0.05, 10.05, 100},
 		mshFile = "examples/2D/ballInFluid/geometry.msh"
 	},

@@ -59,7 +59,9 @@ m_step(0)
         mesh.checkAndGet<double>("gamma"),
         mesh.checkAndGet<double>("omega"),
         mesh.checkAndGet<std::vector<double>>("boundingBox"),
-        mesh.checkAndGet<std::string>("mshFile")
+        mesh.checkAndGet<std::string>("mshFile"),
+        mesh.checkAndGet<bool>("addOnFS"),
+        mesh.checkAndGet<bool>("deleteFlyingNodes")
     };
 
     std::cout << "Loading the mesh" << std::flush;

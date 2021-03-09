@@ -176,6 +176,9 @@ void Mesh::triangulateAlphaShape2D()
         }
     }
 
+    if(m_deleteFlyingNodes)
+        deleteFlyingNodes(false);
+
     computeFSNormalCurvature();
 
     if(m_elementsList.empty())

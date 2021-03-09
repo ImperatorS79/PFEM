@@ -24,6 +24,8 @@ struct MeshCreateInfo
     std::vector<double> boundingBox = {}; /**< Nodes and elements outised bounding box are deleted. Format:
                                                \f$ [x_{min}, y_{min}, (z_{min}, )x_{max}, y_{max}, (z_{max}) ] \f$ */
     std::string mshFile = {}; /**< The path to the .msh file to load */
+    bool addOnFS = true;
+    bool deleteFlyingNodes = false;
 };
 
 /**
@@ -52,6 +54,8 @@ class MESH_API Mesh
 
         /// \brief Display the mesh parameters to console.
         void displayToConsole() const noexcept;
+
+        void deleteFlyingNodes(bool verboseOutput) noexcept;
 
         /// \param nodeIndex The index of the boundary node in the nodes list.
         /// \return The initial position of the node.
@@ -199,6 +203,8 @@ class MESH_API Mesh
         double m_omega; /**< Control the addition of node if a triangle is too big (a node is added if A_triangle > omege*hchar^2). */
         double m_gamma; /**< Control the deletetion of node if two are too close to each other (a node is deleted if d_nodes < gamma*hchar). */
         std::vector<double> m_boundingBox; /**< Box delimiting the zone of nodes existence (format: [xmin, ymin, xmax, ymax]). */
+        bool m_addOnFS;
+        bool m_deleteFlyingNodes;
 
         bool m_computeNormalCurvature;      /**< Control if mesh update should compute normals and curvatures of free surface. */
 

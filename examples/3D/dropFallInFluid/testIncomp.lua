@@ -8,6 +8,8 @@ Problem = {
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
+		addOnFS = true,
+		deleteFlyingNodes = false,
 		boundingBox = {-1, -1, -1, 1, 1, 100},
 		mshFile = "examples/3D/dropFallInFluid/geometry.msh"
 	},
