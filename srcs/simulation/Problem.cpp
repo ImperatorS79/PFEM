@@ -332,6 +332,9 @@ void Problem::simulate()
         }
 
         m_pSolver->computeNextDT();
+
+        if(m_pSolver->getTimeStep() < 1e-20)
+            throw std::runtime_error("time step reached nearly zero!");
     }
 
     std::cout << std::endl;
