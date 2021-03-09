@@ -8,6 +8,8 @@ Problem = {
 		alpha = 1.1,
 		omega = 0.7,
 		gamma = 0.7,
+		addOnFS = true,
+		deleteFlyingNodes = false,
 		boundingBox = {-0.1, -0.1, 5, 1.1},
 		mshFile = "examples/2D/pipe/geometry.msh"
 	},
