@@ -15,21 +15,21 @@ class SolTable
         SolTable(const std::string& tableName, const sol::state& state):
         m_tableName(tableName)
         {
-            sol::table table = state[tableName];
-            if(!table.valid())
+            auto obj = state[tableName];
+            if(!obj.valid())
                 throw std::runtime_error("Could not find table" + tableName + "inside sol::state!");
 
-            m_tableInternal = table;
+            m_tableInternal = state[tableName];
         }
 
         SolTable(const std::string& tableName, const SolTable& solTable):
         m_tableName(tableName)
         {
-            sol::table table = solTable.m_tableInternal[tableName];
-            if(!table.valid())
-                throw std::runtime_error("Could not find table" + tableName + "inside sol::state!");
+            auto obj = solTable.m_tableInternal[tableName];
+            if(!obj.valid())
+                throw std::runtime_error("Could not find table " + tableName + " inside table " + solTable.getName());
 
-            m_tableInternal = table;
+            m_tableInternal = solTable.m_tableInternal[tableName];
         }
 
         SolTable(sol::table table):
@@ -43,7 +43,7 @@ class SolTable
         template<typename T, typename... Args>
         T call(const std::string& functionName, Args... args) const noexcept
         {
-            sol::protected_function_result res = m_tableInternal[functionName](m_tableInternal, args...);
+            sol::unsafe_function_result res = m_tableInternal[functionName](m_tableInternal, args...);
 
             return res.get<T>();
         }
@@ -77,22 +77,23 @@ class SolTable
         template<typename T>
         T checkAndGet(const std::string& propertyName) const
         {
-            //std::cout << propertyName << std::endl;
-            sol::object object = m_tableInternal[propertyName];
-            //std::cout << "Merde" << std::endl;
-            if(!object.valid())
+            auto obj = m_tableInternal[propertyName];
+            if(!obj.valid())
             {
-                sol::error err = object.as<sol::error>();
-                throw std::runtime_error("Property " + propertyName + " was not found in table " + m_tableName + ": " +
-                                         std::string(err.what()) + "!");
+                throw std::runtime_error("Property " + propertyName + " was not found in table " + m_tableName + "!");
             }
 
-            return object.as<T>();
+            return obj.get<T>();
         }
 
         void for_each(std::function<void(sol::object /*key*/, sol::object /*value*/)> f) const
         {
             return m_tableInternal.for_each(f);
+        }
+
+        inline std::string getName() const noexcept
+        {
+            return m_tableName;
         }
 
     private:

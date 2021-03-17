@@ -29,12 +29,19 @@ int main(int argc, char **argv)
     {
         std::ifstream luaFile(argv[1]);
         if(!luaFile.is_open())
-            throw std::runtime_error("Cannot open lua file " + std::string(argv[1]) + "!");
+            throw std::runtime_error("cannot open lua file " + std::string(argv[1]) + "!");
 
         luaFile.close();
 
         //hack
         sol::state state;
+        auto res = state.safe_script_file(argv[1]);
+        if(!res.valid())
+        {
+            sol::error err = res;
+            throw std::runtime_error(std::string("an error occured while loading lua file: ") + err.what());
+        }
+        state = {};
         state.script_file(argv[1]);
 
         SolTable table = SolTable("Problem", state);
@@ -46,7 +53,7 @@ int main(int argc, char **argv)
         else if(problemType == "WCompNewtonNoT" || problemType == "BoussinesqWC")
             pProblem = std::make_unique<ProbWCompNewton>(argv[1]);
         else
-            throw std::runtime_error("Unknown problem type " + problemType + "!");
+            throw std::runtime_error("unknown problem type " + problemType + "!");
 
         pProblem->simulate();
     }
