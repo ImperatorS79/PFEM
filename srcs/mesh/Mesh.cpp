@@ -511,13 +511,13 @@ std::vector<double> Mesh::getGaussWeight(unsigned int dimension, unsigned int n)
             switch(n)
             {
                 case 1:
-                    return {2.0};
+                    return {2.0/2.0};
                 case 2:
-                    return {1.0, 1.0};
+                    return {1.0/2.0, 1.0/2.0};
                 case 3:
-                    return {5.0/9.0, 8.0/9.0, 5.0/9.0};
+                    return {5.0/18.0, 8.0/18.0, 5.0/18.0};
                 case 4:
-                    return {0.347853845137454,0.652145154862546 ,0.652145154862546, 0.347853845137454};
+                    return {0.347853845137454/2.0,0.652145154862546/2.0 ,0.652145154862546/2.0, 0.347853845137454/2.0};
                 default:
                     throw std::runtime_error("Unexpected number of gauss point in 1D: " + std::to_string(n));
             }

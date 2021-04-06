@@ -248,17 +248,17 @@ Eigen::VectorXd MatrixBuilder::getQN(const Facet& facet)
         std::array<double, 3> nodeNormal = m_mesh.getBoundFSNormal(facet.getNodeIndex(i));
 
         for(std::size_t d = 0 ; d < m_mesh.getDim() ; ++d)
-            n(i*noPerFacet + d) = nodeNormal[d];
+            n(d*noPerFacet + i) = nodeNormal[d];
     }
 
     for(unsigned int i = 0 ; i < m_NLD.size() ; ++ i)
     {
         Eigen::VectorXd q = m_QFunc(facet, m_gaussPointsLD[i]);
-        double fact = (q.transpose()*m_NLDtilde[i]*n).value();
+        double fact = (q.transpose()*m_NLDtilde[i]*n).value()*m_gaussWeightLD[i];
         qn += fact*m_NLD[i].transpose();
     }
 
-    return qn;
+    return qn*m_mesh.getRefElementSize(m_mesh.getDim() - 1)*facet.getDetJ();
 }
 
 Eigen::MatrixXd MatrixBuilder::getK(const Element& element, const Eigen::MatrixXd& B)
