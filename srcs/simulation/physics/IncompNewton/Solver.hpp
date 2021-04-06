@@ -27,6 +27,7 @@ class SIMULATION_API SolverIncompNewton: public Solver
 		double m_initialDT;
 
 		bool m_solveHeatFirst;
+		bool m_useIterativSolver;
 
 		std::function<bool()> m_solveFunc;
 		bool m_solveIncompNewtonNoT();

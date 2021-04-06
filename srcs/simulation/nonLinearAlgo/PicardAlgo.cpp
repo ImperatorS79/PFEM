@@ -1,16 +1,16 @@
 #include "PicardAlgo.hpp"
 
+#include <iostream>
 
-PicardAlgo::PicardAlgo(std::function<void(Eigen::SparseMatrix<double>& /** A **/,
-                                          Eigen::VectorXd& /** b **/,
-                                          const Eigen::VectorXd& /** qPrev **/)> buildAb,
-                       std::function<void(Eigen::VectorXd& /** b **/,
-                                          const Eigen::VectorXd& /** qPrev **/)> applyBC,
-                       std::function<void(const Eigen::VectorXd& /** q **/)> exetuteTask,
-                       std::function<double(const Eigen::VectorXd& /** qIter **/,
-                                            const Eigen::VectorXd& /** qIterPrev **/)> computeRes,
+#include "../../mesh/Mesh.hpp"
+
+PicardAlgo::PicardAlgo(std::function<void(const std::vector<Eigen::VectorXd>& /** qPrevVec **/)> prepare,
+                       std::function<bool(std::vector<Eigen::VectorXd>& /** qIterVec **/,
+                                          const std::vector<Eigen::VectorXd>& /** qPrevVec **/)> solve,
+                       std::function<double(const std::vector<Eigen::VectorXd>& /** qIterVec **/,
+                                            const std::vector<Eigen::VectorXd>& /** qIterPrevVec **/)> computeRes,
                        unsigned int maxIter, double minRes):
-NonLinearAlgo(buildAb, applyBC, exetuteTask, computeRes),
+NonLinearAlgo(prepare, solve, computeRes),
 m_maxIter(maxIter),
 m_minRes(minRes)
 {
@@ -28,16 +28,20 @@ void PicardAlgo::displayParams()
               << " * Maximum iteration count: " << m_maxIter << std::endl;
 }
 
-bool PicardAlgo::solve(Mesh* pMesh, const Eigen::VectorXd& qPrev, bool verboseOutput)
+bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec, bool verboseOutput)
 {
-    Eigen::SparseMatrix<double> A(qPrev.rows(), qPrev.rows());
-    Eigen::VectorXd b(qPrev.rows());
+    m_prepare(qPrevVec);
 
-    pMesh->saveNodesList();
+    std::vector<Eigen::VectorXd> qIterVec(qPrevVec.size());
+    std::vector<Eigen::VectorXd> qIterPrevVec(qPrevVec.size());
 
-    unsigned int iterCount = 0;
-    Eigen::VectorXd qIter(qPrev.rows()); qIter.setZero();
-    Eigen::VectorXd qIterPrev(qPrev.rows());
+	for(std::size_t i = 0 ; i < qIterVec.size() ; ++i)
+	{
+		qIterVec[i].resize(qPrevVec[i].rows()); qIterVec[i].setZero();
+		qIterPrevVec[i] = qPrevVec[i];
+	}
+
+	unsigned int iterCount = 0;
     double res = std::numeric_limits<double>::max();
 
     while(res > m_minRes)
@@ -48,41 +52,19 @@ bool PicardAlgo::solve(Mesh* pMesh, const Eigen::VectorXd& qPrev, bool verboseOu
                       << iterCount << ")" << std::endl;
         }
 
-        qIterPrev = qIter;
-
-        m_buildAb(A, b, qPrev);
-        m_applyBC(b, qPrev);
-        m_solver.compute(A);
-
-        if(m_solver.info() == Eigen::Success)
-        {
-            qIter = m_solver.solve(b);
-        }
-        else
-        {
-            if(verboseOutput)
-                std::cout << "\t * The Eigen::SparseLU solver failed to factorize the A matrix!" << std::endl;
-            pMesh->restoreNodesList();
+        if(!m_solve(qIterVec, qPrevVec))
             return false;
-        }
-
-        m_executeTask(qIter);
 
         iterCount++;
 
-        if(iterCount == 1)
-        {
-            res = std::numeric_limits<double>::max();
-        }
-        else
-        {
-            res = m_computeRes(qIter, qIterPrev);
-        }
+        res = m_computeRes(qIterVec, qIterPrevVec);
 
         if(verboseOutput)
             std::cout << "\t * Relative 2-norm of q: " << res << " vs "
                       << m_minRes << std::endl;
 
+        for(std::size_t i = 0 ; i < qIterVec.size() ; ++i)
+			qIterPrevVec[i] = qIterVec[i];
 
         if(iterCount > m_maxIter)
         {

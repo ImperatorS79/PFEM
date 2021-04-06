@@ -11,7 +11,7 @@ Solver(pProblem, pMesh, problemParams)
     if(m_pProblem->getID() != "IncompNewtonNoT" && m_pProblem->getID() != "Boussinesq" && m_pProblem->getID() != "Conduction")
         throw std::runtime_error("this solver cannot be used with problem whose id is " + m_pProblem->getID());
 
-    if(m_id != "PSPG")
+    if(m_id != "PSPG" && m_id != "FracStep")
         throw std::runtime_error("this solver does not know id " + m_id);
 
     //Load material params for equations
@@ -79,7 +79,7 @@ Solver(pProblem, pMesh, problemParams)
             {
                 bool resV = checkBC(bcParamMomCont, n, node, "V", m_pMesh->getDim());
                 bool resT = checkBC(bcParamHeat, n, node, "T", 1);
-                bool resQ = checkBC(bcParamHeat, n, node, "Q", 1);
+                bool resQ = checkBC(bcParamHeat, n, node, "Q", m_pMesh->getDim());
 
                 if(resV)
                     m_pMesh->setNodeFlag(n, 0);
@@ -121,7 +121,7 @@ Solver(pProblem, pMesh, problemParams)
             if(node.isBound())
             {
                 bool resT = checkBC(bcParamHeat, n, node, "T", 1);
-                bool resQ = checkBC(bcParamHeat, n, node, "Q", 1);
+                bool resQ = checkBC(bcParamHeat, n, node, "Q", m_pMesh->getDim());
 
                 if(resT)
                     m_pMesh->setNodeFlag(n, 1);

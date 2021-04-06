@@ -3,14 +3,6 @@
 #define PICARDALGO_HPP_INCLUDED
 
 #include <functional>
-#include <Eigen/IterativeLinearSolvers>
-#ifdef EIGEN_USE_MKL_ALL
-    #include <Eigen/PardisoSupport>
-    typedef Eigen::PardisoLU<Eigen::SparseMatrix<double>> EigenSparseSolver;
-#else
-    #include <Eigen/SparseLU>
-    typedef Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> EigenSparseSolver;
-#endif
 
 #include "NonLinearAlgo.hpp"
 
@@ -22,25 +14,20 @@
 class PicardAlgo : public NonLinearAlgo
 {
     public:
-        PicardAlgo(std::function<void(Eigen::SparseMatrix<double>& /** A **/,
-                                      Eigen::VectorXd& /** b **/,
-                                      const Eigen::VectorXd& /** qPrev **/)> buildAb,
-                   std::function<void(Eigen::VectorXd& /** b **/,
-                                      const Eigen::VectorXd& /** qPrev **/)> applyBC,
-                   std::function<void(const Eigen::VectorXd& /** qIter**/)> executeTask,
-                   std::function<double(const Eigen::VectorXd& /** qIter **/,
-                                        const Eigen::VectorXd& /** qIterPrev **/)> computeRes,
+        PicardAlgo(std::function<void(const std::vector<Eigen::VectorXd>& /** qPrevVec **/)> prepare,
+                   std::function<bool(std::vector<Eigen::VectorXd>& /** qIterVec **/,
+                                      const std::vector<Eigen::VectorXd>& /** qPrevVec **/)> solve,
+                   std::function<double(const std::vector<Eigen::VectorXd>& /** qIterVec **/,
+                                        const std::vector<Eigen::VectorXd>& /** qIterPrevVec **/)> computeRes,
                    unsigned int maxIter, double minRes);
 
         ~PicardAlgo() override;
 
         void displayParams() override;
-        bool solve(Mesh* pMesh, const Eigen::VectorXd& qPrev, bool verboseOutput) override;
+        bool solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec, bool verboseOutput) override;
     private:
         unsigned int m_maxIter;
         double m_minRes;
-
-        EigenSparseSolver m_solver;
 };
 
 #endif // PICARDALGO_HPP_INCLUDED

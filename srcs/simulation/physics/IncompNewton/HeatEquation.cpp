@@ -42,22 +42,43 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     unsigned int maxIter = m_equationParams[0].checkAndGet<unsigned int>("maxIter");
     double minRes = m_equationParams[0].checkAndGet<double>("minRes");
 
-    m_pPicardAlgo = std::make_unique<PicardAlgo>([this](auto& A, auto& b, const auto& qPrev){
-        this->m_buildAb(A, b, qPrev);
+    m_pPicardAlgo = std::make_unique<PicardAlgo>([&](const auto& qPrevVec){
+        m_A.resize(qPrevVec[0].rows(), qPrevVec[0].rows());
+        m_b.resize(qPrevVec[0].rows()); m_b.setZero();
+        m_pMesh->saveNodesList();
     },
-    [this](auto& b, const auto& qPrev){
-        this->m_applyBC(b, qPrev);
-    },
-    [this](const auto& q){
-        this->m_executeTask(q);
-    },
-    [this](const auto& qIter, const auto& qIterPrev) -> double {
-        double num = 0, den = 0;
+    [&](auto& qIterVec, const auto& qPrevVec){
+        m_buildAb(m_A, m_b, qPrevVec[0]);
+        m_applyBC(m_A, m_b, qPrevVec[0]);
+        m_solverIt.compute(m_A);
 
-        for(auto i = 0 ; i < qIter.rows() ; ++i)
+        if(m_solverIt.info() == Eigen::Success)
         {
-            num += (qIter(i) - qIterPrev(i))*(qIter(i) - qIterPrev(i));
-            den += qIterPrev(i)*qIterPrev(i);
+            qIterVec[0] = m_solverIt.solveWithGuess(m_b, qPrevVec[0]);
+            setNodesStatesfromQ(m_pMesh, qIterVec[0], m_statesIndex[0], m_statesIndex[0]);
+            return true;
+        }
+        else
+        {
+            if(m_pProblem->isOutputVerbose())
+                std::cout << "\t * The Eigen::SparseLU solver failed to factorize the A matrix!" << std::endl;
+            m_pMesh->restoreNodesList();
+            return false;
+        }
+    },
+    [&](const auto& qIterVec, const auto& qIterPrevVec) -> double {
+        double num = 0, den = 0;
+        Mesh* p_Mesh = this->m_pMesh;
+
+        for(std::size_t n = 0 ; n < p_Mesh->getNodesCount() ; ++n)
+        {
+            const Node& node = p_Mesh->getNode(n);
+
+            if(!node.isFree())
+            {
+                num += (qIterVec[0](n) - qIterPrevVec[0](n))*(qIterVec[0](n) - qIterPrevVec[0](n));
+                den += qIterPrevVec[0](n)*qIterPrevVec[0](n);
+            }
         }
 
         return std::sqrt(num/den);
@@ -85,8 +106,8 @@ bool HeatEqIncompNewton::solve()
     if(m_pProblem->isOutputVerbose())
         std::cout << "Heat Equation" << std::endl;
 
-    Eigen::VectorXd qPrev = getQFromNodesStates(m_pMesh, m_statesIndex[0], m_statesIndex[0]);
-    return m_pPicardAlgo->solve(m_pMesh, qPrev, m_pProblem->isOutputVerbose());
+    std::vector<Eigen::VectorXd> qPrevVec = {getQFromNodesStates(m_pMesh, m_statesIndex[0], m_statesIndex[0])};
+    return m_pPicardAlgo->solve(m_pMesh, qPrevVec, m_pProblem->isOutputVerbose());
 }
 
 void HeatEqIncompNewton::m_buildAb(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
@@ -187,7 +208,7 @@ void HeatEqIncompNewton::m_buildAb(Eigen::SparseMatrix<double>& A, Eigen::Vector
     }
 }
 
-void HeatEqIncompNewton::m_applyBC(Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
+void HeatEqIncompNewton::m_applyBC(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
 {
     const std::size_t nodesCount = m_pMesh->getNodesCount();
 
@@ -234,11 +255,18 @@ void HeatEqIncompNewton::m_applyBC(Eigen::VectorXd& b, const Eigen::VectorXd& qP
                                                              m_pProblem->getCurrentSimTime() +
                                                              m_pSolver->getTimeStep());
             b(n) = result[0];
+            for(Eigen::SparseMatrix<double>::InnerIterator it(A, n); it; ++it)
+            {
+                Eigen::Index row = it.row();
+                if(row == it.col())
+                    continue;
+
+                double value = it.value();
+                b(row) -= value*result[0];
+                it.valueRef() = 0;
+            }
         }
     }
-}
 
-void HeatEqIncompNewton::m_executeTask(const Eigen::VectorXd& qIter)
-{
-    setNodesStatesfromQ(m_pMesh, qIter, m_statesIndex[0], m_statesIndex[0]);
+    A.makeCompressed();
 }

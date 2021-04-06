@@ -2,17 +2,13 @@
 
 #include <stdexcept>
 
-NonLinearAlgo::NonLinearAlgo(std::function<void(Eigen::SparseMatrix<double>& /** A **/,
-                                                Eigen::VectorXd& /** b **/,
-                                                const Eigen::VectorXd& /** qPrev **/)> buildAb,
-                             std::function<void(Eigen::VectorXd& /** b **/,
-                                                const Eigen::VectorXd& /** qPrev **/)> applyBC,
-                             std::function<void(const Eigen::VectorXd& /** q **/)> executeTask,
-                             std::function<double(const Eigen::VectorXd& /** qIter **/,
-                                                  const Eigen::VectorXd& /** qIterPrev **/)> computeRes):
-m_buildAb(buildAb),
-m_applyBC(applyBC),
-m_executeTask(executeTask),
+NonLinearAlgo::NonLinearAlgo(std::function<void(const std::vector<Eigen::VectorXd>& /** qPrevVec **/)> prepare,
+                             std::function<bool(std::vector<Eigen::VectorXd>& /** qIterVec **/,
+                                                const std::vector<Eigen::VectorXd>& /** qPrevVec **/)> solve,
+                             std::function<double(const std::vector<Eigen::VectorXd>& /** qIterVec **/,
+                                                  const std::vector<Eigen::VectorXd>& /** qIterPrevVec **/)> computeRes):
+m_prepare(prepare),
+m_solve(solve),
 m_computeRes(computeRes)
 {
 
@@ -28,10 +24,10 @@ void NonLinearAlgo::displayParams()
     throw std::runtime_error("Unimplemented function by the child class -> NonLinearAlgo::displayParams()");
 }
 
-bool NonLinearAlgo::solve(Mesh* pMesh, const Eigen::VectorXd& qPrev, bool verboseOutput)
+bool NonLinearAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec, bool verboseOutput)
 {
     (void)pMesh;
-    (void)qPrev;
+    (void)qPrevVec;
     (void)verboseOutput;
     throw std::runtime_error("Unimplemented function by the child class -> NonLinearAlgo::solve(pMesh, qPrev)");
 }

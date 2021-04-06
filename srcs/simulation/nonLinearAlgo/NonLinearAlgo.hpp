@@ -6,7 +6,7 @@
 #include <Eigen/Sparse>
 #include <Eigen/Dense>
 
-#include "../../mesh/Mesh.hpp"
+class Mesh;
 
 /**
  * \class NonLinearAlgo
@@ -15,31 +15,25 @@
 class NonLinearAlgo
 {
     public:
-        NonLinearAlgo(std::function<void(Eigen::SparseMatrix<double>& /** A **/,
-                                         Eigen::VectorXd& /** b **/,
-                                         const Eigen::VectorXd& /** qPrev **/)> buildAb,
-                      std::function<void(Eigen::VectorXd& /** b **/,
-                                         const Eigen::VectorXd& /** qPrev **/)> applyBC,
-                      std::function<void(const Eigen::VectorXd& /** qIter **/)> executeTask,
-                      std::function<double(const Eigen::VectorXd& /** qIter **/,
-                                           const Eigen::VectorXd& /** qIterPrev **/)> computeRes);
+        NonLinearAlgo(std::function<void(const std::vector<Eigen::VectorXd>& /** qPrevVec **/)> prepare,
+                      std::function<bool(std::vector<Eigen::VectorXd>& /** qIterVec **/,
+                                         const std::vector<Eigen::VectorXd>& /** qPrevVec **/)> solve,
+                      std::function<double(const std::vector<Eigen::VectorXd>& /** qIterVec **/,
+                                           const std::vector<Eigen::VectorXd>& /** qIterPrevVec **/)> computeRes);
 
         virtual ~NonLinearAlgo();
 
         virtual void displayParams();
-        virtual bool solve(Mesh* pMesh, const Eigen::VectorXd& qPrev, bool verboseOutput);
+        virtual bool solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec, bool verboseOutput);
 
     protected:
-        std::function<void(Eigen::SparseMatrix<double>&,
-                           Eigen::VectorXd&,
-                           const Eigen::VectorXd&)> m_buildAb;
+        std::function<void(const std::vector<Eigen::VectorXd>&)> m_prepare;
 
-        std::function<void(Eigen::VectorXd&,
-                           const Eigen::VectorXd&)> m_applyBC;
+        std::function<bool(std::vector<Eigen::VectorXd>&,
+                           const std::vector<Eigen::VectorXd>&)> m_solve;
 
-        std::function<void(const Eigen::VectorXd&)> m_executeTask;
-
-        std::function<double(const Eigen::VectorXd&, const Eigen::VectorXd&)> m_computeRes;
+        std::function<double(const std::vector<Eigen::VectorXd>&,
+                             const std::vector<Eigen::VectorXd>&)> m_computeRes;
 };
 
 #endif // NONLINEARALGO_HPP_INCLUDED
