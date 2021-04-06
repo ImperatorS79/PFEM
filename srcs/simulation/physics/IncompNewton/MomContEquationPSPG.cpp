@@ -1,6 +1,7 @@
 #include "MomContEquation.hpp"
 #include "../../Problem.hpp"
 #include "../../Solver.hpp"
+#include "../../utility/StatesFromToQ.hpp"
 
 void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
 {
