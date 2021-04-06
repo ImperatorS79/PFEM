@@ -86,6 +86,12 @@ class SolTable
             return obj.get<T>();
         }
 
+        bool doesVarExist(const std::string& propertyName) const
+        {
+            auto obj = m_tableInternal[propertyName];
+            return obj.valid();
+        }
+
         void for_each(std::function<void(sol::object /*key*/, sol::object /*value*/)> f) const
         {
             return m_tableInternal.for_each(f);
