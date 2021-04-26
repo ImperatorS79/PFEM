@@ -2,9 +2,11 @@
 #ifndef SOLVER_HPP_INCLUDED
 #define SOLVER_HPP_INCLUDED
 
+#include <map>
 #include <memory>
 #include <vector>
 
+#include "utility/Clock.hpp"
 #include "utility/SolTable.hpp"
 
 #include "simulation_defines.h"
@@ -34,6 +36,9 @@ class SIMULATION_API Solver
         /// \brief Display general parameters of the solver.
         virtual void displayParams() const;
 
+        /// \brief Display time statistics.
+        void displayTimeStats() const;
+
         bool checkBC(SolTable bcParam, unsigned int n, const Node& node, std::string bcString, unsigned int expectedBCSize);
 
         /// \return The id of the solver (child class have to set m_id).
@@ -45,6 +50,9 @@ class SIMULATION_API Solver
 
         /// \brief Compute the next time step which will be used at the next call of solveOneTimeStep.
         virtual void computeNextDT();
+
+        /// \return Get the number of additional states required by the solver with respect to the problem.
+        virtual std::size_t getAdditionalStateCount() const;
 
         inline double getTimeStep() const noexcept;
 
@@ -59,6 +67,13 @@ class SIMULATION_API Solver
 
         Mesh* m_pMesh;          /**< Pointer to the mesh used. */
         Problem* m_pProblem;    /**< Pointer to the underlying problem. */
+
+        std::map<std::string, double> m_accumalatedTimes;  /**< Accumulated time in each part of the solver*/
+        Clock m_clock;
+
+        double m_nextTimeToRemesh;
+        void m_computeNextRemeshTime(bool force);
+        void m_conditionalRemesh(std::size_t speedIndex);
 };
 
 #include "Solver.inl"

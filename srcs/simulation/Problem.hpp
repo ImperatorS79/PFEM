@@ -3,10 +3,12 @@
 #define PROBLEM_HPP_INCLUDED
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "utility/Clock.hpp"
 #include "utility/SolTable.hpp"
 
 #include "../mesh/Mesh.hpp"
@@ -37,6 +39,9 @@ class SIMULATION_API Problem
 
         /// \brief Display general parameters of the problem.
         virtual void displayParams() const;
+
+        /// \brief Display time statistics.
+        void displayTimeStats() const;
 
         /// \return The id of the problem (child class have to set m_id).
         std::string getID() const noexcept;
@@ -96,6 +101,9 @@ class SIMULATION_API Problem
         std::unique_ptr<Mesh> m_pMesh;          /**<  Smart pointer to the mesh. */
         std::unique_ptr<Solver> m_pSolver;      /**<  Smart pointer to the solver. */
         std::vector<std::unique_ptr<Extractor>> m_pExtractors;  /**<  Smart pointer to the extractirs. */
+
+        std::map<std::string, double> m_accumalatedTimes;  /**< Accumulated time in each part of the solver*/
+        Clock m_clock;
 
         /// \brief This function parse the lua parameters file and set the requires extractors in m_pExtractors.
         /// Should be called in the constructor of every child class.

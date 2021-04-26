@@ -11,6 +11,7 @@ void MomContEqIncompNewton::m_buildMatFracStep(Eigen::SparseMatrix<double>& M,
                                                std::vector<Eigen::MatrixXd>& Lelm, Eigen::VectorXd& bVAppStep,
                                                const std::vector<Eigen::VectorXd>& qPrev)
 {
+    m_clock.start();
     unsigned int dim = m_pMesh->getDim();
     unsigned int noPerEl = m_pMesh->getNodesPerElm();
     unsigned int tripletPerElmM = (dim*noPerEl*noPerEl);
@@ -33,7 +34,9 @@ void MomContEqIncompNewton::m_buildMatFracStep(Eigen::SparseMatrix<double>& M,
         DTelm[elm].resize(dim*noPerEl, noPerEl);
         Lelm[elm].resize(noPerEl, noPerEl);
     }
+    m_accumalatedTimes["Prepare matrices assembly"] += m_clock.end();
 
+    m_clock.start();
     Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < nElm ; ++elm)
@@ -100,6 +103,7 @@ void MomContEqIncompNewton::m_buildMatFracStep(Eigen::SparseMatrix<double>& M,
                                                    element.getNodeIndex(j) + d*nNodes,
                                                    Me_dt(i + d*noPerEl, j + d*noPerEl));
                     }
+
                     countM++;
                     countMK_dt++;
 
@@ -152,13 +156,13 @@ void MomContEqIncompNewton::m_buildMatFracStep(Eigen::SparseMatrix<double>& M,
             }
         }
     }
-    Eigen::setNbThreads(m_pProblem->getThreadCount());;
-//    char c;
-//    std::cin >> c;
+    Eigen::setNbThreads(m_pProblem->getThreadCount());
+    m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
     //Best would be to know the number of nodes in which case :/
     //This can still be fasten using OpenMP but will never be as good as using []
     //with preallocated memory
+    m_clock.start();
     for(std::size_t n = 0 ; n < nNodes ; ++n)
     {
         const Node& node = m_pMesh->getNode(n);
@@ -182,21 +186,24 @@ void MomContEqIncompNewton::m_buildMatFracStep(Eigen::SparseMatrix<double>& M,
             }
         }
     }
-
+    m_accumalatedTimes["Push back (n, n, 1)"] += m_clock.end();
 
     /********************************************************************************
                                         Compute A and b
     ********************************************************************************/
+    m_clock.start();
     M.setFromTriplets(indexM.begin(), indexM.end());
     MK_dt.setFromTriplets(indexMK_dt.begin(), indexMK_dt.end());
     dtL.setFromTriplets(indexDtL.begin(), indexDtL.end());
+    m_accumalatedTimes["Assemble matrices"] += m_clock.end();
 
+    m_clock.start();
     for(const auto& doublet : indexbVappStep)
     {
         //std::cout << doublet.first << ", " << doublet.second << std::endl;
         bVAppStep[doublet.first] += doublet.second;
     }
-
+    m_accumalatedTimes["Assemble b v app step"] += m_clock.end();
 }
 
 void MomContEqIncompNewton::m_applyBCVAppStep(Eigen::SparseMatrix<double>& MK_dt, Eigen::VectorXd& bVAppStep, const Eigen::VectorXd& qPrev)
@@ -207,11 +214,11 @@ void MomContEqIncompNewton::m_applyBCVAppStep(Eigen::SparseMatrix<double>& MK_dt
     const std::size_t facetsCount = m_pMesh->getFacetsCount();
     const std::size_t noPerFacet = m_pMesh->getNodesPerFacet();
 
+    if(m_gamma < 1e-15)
+        goto applyBC; //Heresy ^^
+
     for(std::size_t f = 0 ; f < facetsCount ; ++f)
     {
-        if(m_gamma < 1e-15)
-            continue;
-
         const Facet& facet = m_pMesh->getFacet(f);
 
         bool onFS = true;
@@ -249,6 +256,7 @@ void MomContEqIncompNewton::m_applyBCVAppStep(Eigen::SparseMatrix<double>& MK_dt
     }
 
     //Do not parallelize this (lua)
+    applyBC:
     for (std::size_t n = 0 ; n < nodesCount ; ++n)
     {
         const Node& node = m_pMesh->getNode(n);
@@ -297,6 +305,7 @@ void MomContEqIncompNewton::m_applyBCVAppStep(Eigen::SparseMatrix<double>& MK_dt
 
 void MomContEqIncompNewton::m_buildMatPcorrStep(Eigen::VectorXd& bPcorrStep, const Eigen::VectorXd& qVTilde, const Eigen::VectorXd& qPprev)
 {
+    m_clock.start();
     unsigned int dim = m_pMesh->getDim();
     unsigned int noPerEl = m_pMesh->getNodesPerElm();
     unsigned int doubletPerElm = 2*noPerEl;
@@ -307,7 +316,9 @@ void MomContEqIncompNewton::m_buildMatPcorrStep(Eigen::VectorXd& bPcorrStep, con
     double dt = m_pSolver->getTimeStep();
 
     std::vector<std::pair<std::size_t, double>> indexbPcorrStep(doubletPerElm*nElm); bPcorrStep.setZero();
+    m_accumalatedTimes["Prepare matrices assembly"] += m_clock.end();
 
+    m_clock.start();
     Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < nElm ; ++elm)
@@ -351,12 +362,15 @@ void MomContEqIncompNewton::m_buildMatPcorrStep(Eigen::VectorXd& bPcorrStep, con
         }
     }
     Eigen::setNbThreads(m_pProblem->getThreadCount());
+    m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
+    m_clock.start();
     for(const auto& doublet : indexbPcorrStep)
     {
         //std::cout << doublet.first << ", " << doublet.second << std::endl;
         bPcorrStep[doublet.first] += doublet.second;
     }
+    m_accumalatedTimes["Assemble p corr step"] += m_clock.end();
 }
 
 void MomContEqIncompNewton::m_applyBCPCorrStep(Eigen::SparseMatrix<double>& L, Eigen::VectorXd& bPcorrStep)
@@ -375,7 +389,10 @@ void MomContEqIncompNewton::m_applyBCPCorrStep(Eigen::SparseMatrix<double>& L, E
             {
                 Eigen::Index row = it.row();
                 if(row == it.col())
+                {
+                    it.valueRef() = 1;
                     continue;
+                }
 
                 it.valueRef() = 0;
             }
@@ -387,6 +404,7 @@ void MomContEqIncompNewton::m_applyBCPCorrStep(Eigen::SparseMatrix<double>& L, E
 
 void MomContEqIncompNewton::m_buildMatVStep(Eigen::VectorXd& bVStep, const Eigen::VectorXd& qDeltaP)
 {
+    m_clock.start();
     unsigned int dim = m_pMesh->getDim();
     unsigned int noPerEl = m_pMesh->getNodesPerElm();
     unsigned int doubletPerElm = dim*noPerEl;
@@ -396,7 +414,9 @@ void MomContEqIncompNewton::m_buildMatVStep(Eigen::VectorXd& bVStep, const Eigen
     std::size_t nNodes = m_pMesh->getNodesCount();
 
     std::vector<std::pair<std::size_t, double>> indexbVStep(doubletPerElm*nElm); bVStep.setZero();
+    m_accumalatedTimes["Prepare matrices assembly"] += m_clock.end();
 
+    m_clock.start();
     Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < nElm ; ++elm)
@@ -430,12 +450,15 @@ void MomContEqIncompNewton::m_buildMatVStep(Eigen::VectorXd& bVStep, const Eigen
         }
     }
     Eigen::setNbThreads(m_pProblem->getThreadCount());
+    m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
+    m_clock.start();
     for(const auto& doublet : indexbVStep)
     {
         //std::cout << doublet.first << ", " << doublet.second << std::endl;
         bVStep[doublet.first] += doublet.second;
     }
+    m_accumalatedTimes["Assemble b v corr step"] += m_clock.end();
 }
 
 void MomContEqIncompNewton::m_applyBCVStep(Eigen::SparseMatrix<double>& M, Eigen::VectorXd& bVStep)
@@ -456,7 +479,10 @@ void MomContEqIncompNewton::m_applyBCVStep(Eigen::SparseMatrix<double>& M, Eigen
                 {
                     Eigen::Index row = it.row();
                     if(row == it.col())
+                    {
+                        it.valueRef() = 1;
                         continue;
+                    }
 
                     it.valueRef() = 0;
                 }
@@ -470,73 +496,112 @@ void MomContEqIncompNewton::m_applyBCVStep(Eigen::SparseMatrix<double>& M, Eigen
 void MomContEqIncompNewton::m_setupPicardFracStep(unsigned int maxIter, double minRes)
 {
     m_pPicardAlgo = std::make_unique<PicardAlgo>([&](const auto& qPrevVec){
+        m_clock.start();
         m_M.resize(qPrevVec[0].rows(), qPrevVec[0].rows());
         m_MK_dt.resize(qPrevVec[0].rows(), qPrevVec[0].rows());
         m_L.resize(qPrevVec[1].rows(), qPrevVec[1].rows());
         m_bVAppStep.resize(qPrevVec[0].rows()); m_bVAppStep.setZero();
         m_bPcorrStep.resize(qPrevVec[1].rows()); m_bPcorrStep.setZero();
         m_bVStep.resize(qPrevVec[0].rows()); m_bVStep.setZero();
+        m_accumalatedTimes["Prepare Picard algorithm"] += m_clock.end();
 
+        m_clock.start();
         m_pMesh->saveNodesList();
+        m_accumalatedTimes["Save/restore nodelist"] += m_clock.end();
     },
     [&](auto& qIterVec, const auto& qPrevVec){
         m_buildMatFracStep(m_M, m_MK_dt, m_L, m_DTelm, m_Lelm, m_bVAppStep, qPrevVec);
+        m_clock.start();
         m_applyBCVAppStep(m_MK_dt, m_bVAppStep, qPrevVec[0]);
+        m_accumalatedTimes["Apply boundary conditions v app step"] += m_clock.end();
+        m_clock.start();
         m_solverIt.compute(m_MK_dt);
+        m_accumalatedTimes["Compute matrix v app step"] += m_clock.end();
         Eigen::VectorXd qVTilde(qPrevVec[0].rows());
 
         if(m_solverIt.info() == Eigen::Success)
+        {
+            m_clock.start();
             qVTilde = m_solverIt.solve(m_bVAppStep);
+            m_accumalatedTimes["Solve system v app step"] += m_clock.end();
+        }
         else
         {
             if(m_pProblem->isOutputVerbose())
                 std::cout << "\t * The Eigen solver failed to factorize the matrix for the velocity guess step!" << std::endl;
+            m_clock.start();
             m_pMesh->restoreNodesList();
+            m_accumalatedTimes["Save/restore nodelist"] += m_clock.end();
             return false;
         }
 
         m_buildMatPcorrStep(m_bPcorrStep, qVTilde, qPrevVec[1]);
+        m_clock.start();
         m_applyBCPCorrStep(m_L, m_bPcorrStep);
+        m_accumalatedTimes["Apply boundary conditions p corr step"] += m_clock.end();
+        m_clock.start();
         m_solverIt.compute(m_L);
+        m_accumalatedTimes["Compute matrix p corr step"] += m_clock.end();
         Eigen::VectorXd qDeltaP(qPrevVec[1].rows());
 
         if(m_solverIt.info() == Eigen::Success)
+        {
+            m_clock.start();
             qIterVec[1] = m_solverIt.solve(m_bPcorrStep);
+            m_accumalatedTimes["Solve system p corr step"] += m_clock.end();
+        }
         else
         {
             if(m_pProblem->isOutputVerbose())
                 std::cout << "\t * The Eigen solver failed to factorize the matrix for the pressure correction step!" << std::endl;
+            m_clock.start();
             m_pMesh->restoreNodesList();
+            m_accumalatedTimes["Save/restore nodelist"] += m_clock.end();
             return false;
         }
 
+        m_clock.start();
         qDeltaP = qIterVec[1] - m_gammaFS*qPrevVec[1];
+        m_accumalatedTimes["Update solutions"] += m_clock.end();
 
         m_buildMatVStep(m_bVStep, qDeltaP);
+        m_clock.start();
         m_applyBCVStep(m_M, m_bVStep);
+        m_accumalatedTimes["Apply boundary conditions v corr step"] += m_clock.end();
+        m_clock.start();
         m_solverIt.compute(m_M);
+        m_accumalatedTimes["Compute matrix v corr step"] += m_clock.end();
         Eigen::VectorXd qDeltaV(qPrevVec[0].rows());
 
         if(m_solverIt.info() == Eigen::Success)
+        {
+            m_clock.start();
             qDeltaV = m_solverIt.solve(m_bVStep);
+            m_accumalatedTimes["Solve system v corr step"] += m_clock.end();
+        }
         else
         {
             if(m_pProblem->isOutputVerbose())
                 std::cout << "\t * The Eigen solver failed to factorize the matrix for the pressure correction step!" << std::endl;
+            m_clock.start();
             m_pMesh->restoreNodesList();
+            m_accumalatedTimes["Save/restore nodelist"] += m_clock.end();
             return false;
         }
 
+        m_clock.start();
         qIterVec[0] = qVTilde + qDeltaV;
 
         setNodesStatesfromQ(m_pMesh, qIterVec[0], m_statesIndex[0], m_statesIndex[0] + m_pMesh->getDim() - 1);
         setNodesStatesfromQ(m_pMesh, qIterVec[1], m_pMesh->getDim(), m_pMesh->getDim());
         Eigen::VectorXd deltaPos = qIterVec[0]*m_pSolver->getTimeStep();
-        m_pMesh->updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + m_pMesh->getDim()*m_pMesh->getNodesCount()));
+        m_pMesh->updateNodesPositionFromSave(deltaPos);
+        m_accumalatedTimes["Update solutions"] += m_clock.end();
 
         return true;
      },
     [&](const auto& qIterVec, const auto& qIterPrevVec) -> double {
+        m_clock.start();
         double num = 0, den = 0;
         Mesh* p_Mesh = this->m_pMesh;
 
@@ -554,9 +619,13 @@ void MomContEqIncompNewton::m_setupPicardFracStep(unsigned int maxIter, double m
             }
         }
 
+        double res;
         if(den == 0)
-            return std::numeric_limits<double>::max();
+            res = std::numeric_limits<double>::max();
+        else
+            res = std::sqrt(num/den);
+        m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
 
-        return std::sqrt(num/den);
+        return res;
     }, maxIter, minRes);
 }

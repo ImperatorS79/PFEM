@@ -32,9 +32,12 @@ class SIMULATION_API ContEqWCompNewton : public Equation
         double m_mu;
         double m_alpha;
         double m_Tr;
+        Eigen::VectorXd m_bodyForce;
         bool m_strongContinuity;
         bool m_enableStab;
         double m_keStab;
+
+        std::unique_ptr<MatrixBuilder> m_pMatBuilder2; // TO DO: change mat builder to allow multiple M functions
 
         Eigen::VectorXd m_F0;
 
@@ -42,6 +45,10 @@ class SIMULATION_API ContEqWCompNewton : public Equation
         void m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
         void m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
         Eigen::VectorXd m_getPFromRhoTaitMurnagham(const Eigen::VectorXd& rho);
+
+        void m_buildSystemFIC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
+        void m_applyBCFIC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
+        double m_computeTauFIC(const Element& element) const;
 };
 
 #endif // CONTEQWCOMPNEWTON_HPP_INCLUDED

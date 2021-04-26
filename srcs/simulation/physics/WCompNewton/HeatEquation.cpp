@@ -52,14 +52,24 @@ bool HeatEqWCompNewton::solve()
     if(m_pProblem->isOutputVerbose())
         std::cout << "Heat Equation" << std::endl;
 
+    m_clock.start();
     Eigen::DiagonalMatrix<double,Eigen::Dynamic> invM; //The mass matrix of the continuity.
     Eigen::VectorXd F; //The mass matrix of the continuity.
+    m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
+
     m_buildSystem(invM, F);
+
+    m_clock.start();
     m_applyBC(invM, F);
+    m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
 
+    m_clock.start();
     Eigen::VectorXd qT = invM*F;
+    m_accumalatedTimes["Solve system"] += m_clock.end();
 
+    m_clock.start();
     setNodesStatesfromQ(m_pMesh, qT, m_statesIndex[0], m_statesIndex[0]);
+    m_accumalatedTimes["Update solutions"] += m_clock.end();
 
     return true;
 }
@@ -98,6 +108,7 @@ void HeatEqWCompNewton::m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& 
 
 void HeatEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F)
 {
+    m_clock.start();
     const unsigned short dim = m_pMesh->getDim();
     const std::size_t elementsCount = m_pMesh->getElementsCount();
     const std::size_t nodesCount = m_pMesh->getNodesCount();
@@ -107,7 +118,9 @@ void HeatEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynami
 
     F.resize(nodesCount); F.setZero();
     std::vector<Eigen::VectorXd> FTote(elementsCount);
+    m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
 
+    m_clock.start();
     Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < elementsCount ; ++elm)
@@ -125,7 +138,9 @@ void HeatEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynami
         FTote[elm] = - m_pSolver->getTimeStep()*Le*T + Me[elm]*T;
     }
     Eigen::setNbThreads(m_pProblem->getThreadCount());
+    m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
+    m_clock.start();
     auto& invMDiag = invM.diagonal();
 
     for(std::size_t elm = 0 ; elm < m_pMesh->getElementsCount() ; ++elm)
@@ -141,4 +156,5 @@ void HeatEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynami
     }
 
     MatrixBuilder::inverse(invM);
+    m_accumalatedTimes["Assemble matrix"] += m_clock.end();
 }

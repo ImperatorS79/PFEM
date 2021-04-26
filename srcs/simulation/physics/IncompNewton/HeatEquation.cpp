@@ -18,7 +18,6 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     if(statesIndex.size() != 1)
         throw std::runtime_error("the " + getID() + " equation require one state index describing the T state !");
 
-
     m_pMatBuilder->setMcomputeFactor([&](const Element& /** element **/, const Eigen::MatrixXd& /** N **/) -> double {
         return m_rho*m_cv;
     });
@@ -43,30 +42,47 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     double minRes = m_equationParams[0].checkAndGet<double>("minRes");
 
     m_pPicardAlgo = std::make_unique<PicardAlgo>([&](const auto& qPrevVec){
+        m_clock.start();
         m_A.resize(qPrevVec[0].rows(), qPrevVec[0].rows());
         m_b.resize(qPrevVec[0].rows()); m_b.setZero();
+        m_accumalatedTimes["Prepare Picard Algo"] += m_clock.end();
+
+        m_clock.start();
         m_pMesh->saveNodesList();
+        m_accumalatedTimes["Save/restore nodeslist"] += m_clock.end();
     },
     [&](auto& qIterVec, const auto& qPrevVec){
         m_buildAb(m_A, m_b, qPrevVec[0]);
+
+        m_clock.start();
         m_applyBC(m_A, m_b, qPrevVec[0]);
+        m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
+        m_clock.start();
         m_solverIt.compute(m_A);
+        m_accumalatedTimes["Compute matrix"] += m_clock.end();
 
         if(m_solverIt.info() == Eigen::Success)
         {
+            m_clock.start();
             qIterVec[0] = m_solverIt.solveWithGuess(m_b, qPrevVec[0]);
+            m_accumalatedTimes["Solve system"] += m_clock.end();
+            m_clock.start();
             setNodesStatesfromQ(m_pMesh, qIterVec[0], m_statesIndex[0], m_statesIndex[0]);
+            m_accumalatedTimes["Update solution"] += m_clock.end();
             return true;
         }
         else
         {
             if(m_pProblem->isOutputVerbose())
                 std::cout << "\t * The Eigen::SparseLU solver failed to factorize the A matrix!" << std::endl;
+            m_clock.start();
             m_pMesh->restoreNodesList();
+            m_accumalatedTimes["Save/restore nodeslist"] += m_clock.end();
             return false;
         }
     },
     [&](const auto& qIterVec, const auto& qIterPrevVec) -> double {
+        m_clock.start();
         double num = 0, den = 0;
         Mesh* p_Mesh = this->m_pMesh;
 
@@ -81,8 +97,16 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
             }
         }
 
-        return std::sqrt(num/den);
+        double res;
+        if(den == 0)
+            res = std::numeric_limits<double>::max();
+        else
+            res = std::sqrt(num/den);
+        m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
+        return res;
     }, maxIter, minRes);
+
+    m_pPicardAlgo->runOnlyOnce(true); //When k, cv independant of T, no need of Picard
 
     m_needNormalCurv = true;
 }

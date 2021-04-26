@@ -5,6 +5,7 @@
 
 void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
 {
+    m_clock.start();
     unsigned int dim = m_pMesh->getDim();
     unsigned int noPerEl = m_pMesh->getNodesPerElm();
     unsigned int tripletPerElm = (dim + 1)*noPerEl*(dim + 1)*noPerEl;
@@ -15,7 +16,9 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
 
     std::vector<Eigen::Triplet<double>> indexA(tripletPerElm*nElm);
     std::vector<std::pair<std::size_t, double>> indexb(doubletPerElm*nElm); b.setZero();
+    m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
 
+    m_clock.start();
     Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < nElm ; ++elm)
@@ -82,6 +85,7 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
                                                    element.getNodeIndex(j) + d2*nNodes,
                                                    Ae(i + dim*noPerEl, j + d2*noPerEl));
                     }
+
                     countA++;
                 }
             }
@@ -94,10 +98,12 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
         }
     }
     Eigen::setNbThreads(m_pProblem->getThreadCount());
+    m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
     //Best would be to know the number of nodes in which case :/
     //This can still be fasten using OpenMP but will never be as good as using []
     //with preallocated memory
+    m_clock.start();
     for(std::size_t n = 0 ; n < nNodes ; ++n)
     {
         const Node& node = m_pMesh->getNode(n);
@@ -119,17 +125,22 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
             }
         }
     }
+    m_accumalatedTimes["Push back (n, n, 1)"] += m_clock.end();
 
     /********************************************************************************
                                         Compute A and b
     ********************************************************************************/
+    m_clock.start();
     A.setFromTriplets(indexA.begin(), indexA.end());
+    m_accumalatedTimes["Assemble matrix"] += m_clock.end();
 
+    m_clock.start();
     for(const auto& doublet : indexb)
     {
         //std::cout << doublet.first << ", " << doublet.second << std::endl;
         b[doublet.first] += doublet.second;
     }
+    m_accumalatedTimes["Assemble vector"] += m_clock.end();
 }
 
 void MomContEqIncompNewton::m_applyBCPSPG(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
@@ -255,32 +266,48 @@ double MomContEqIncompNewton::m_computeTauPSPG(const Element& element) const
 void MomContEqIncompNewton::m_setupPicardPSPG(unsigned int maxIter, double minRes)
 {
     m_pPicardAlgo = std::make_unique<PicardAlgo>([&](const auto& qPrevVec){
+        m_clock.start();
         m_A.resize(qPrevVec[0].rows(), qPrevVec[0].rows());
         m_b.resize(qPrevVec[0].rows()); m_b.setZero();
+        m_accumalatedTimes["Prepare Picard algorithm"] += m_clock.end();
+        m_clock.start();
         m_pMesh->saveNodesList();
+        m_accumalatedTimes["Save/restore nodelist"] += m_clock.end();
     },
     [&](auto& qIterVec, const auto& qPrevVec){
         m_buildAbPSPG(m_A, m_b, qPrevVec[0]);
+        m_clock.start();
         m_applyBCPSPG(m_A, m_b, qPrevVec[0]);
+        m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
+
+        m_clock.start();
         m_solver.compute(m_A);
+        m_accumalatedTimes["Compute A matrix"] += m_clock.end();
 
         if(m_solver.info() == Eigen::Success)
         {
+            m_clock.start();
             qIterVec[0] = m_solver.solve(m_b);
+            m_accumalatedTimes["Solve system"] += m_clock.end();
+            m_clock.start();
             setNodesStatesfromQ(m_pMesh, qIterVec[0], m_statesIndex[0], m_statesIndex[0] + m_pMesh->getDim());
             Eigen::VectorXd deltaPos = qIterVec[0]*m_pSolver->getTimeStep();
-            m_pMesh->updateNodesPositionFromSave(std::vector<double> (deltaPos.data(), deltaPos.data() + m_pMesh->getDim()*m_pMesh->getNodesCount()));
+            m_pMesh->updateNodesPositionFromSave(deltaPos);
+            m_accumalatedTimes["Update solutions"] += m_clock.end();
             return true;
         }
         else
         {
             if(m_pProblem->isOutputVerbose())
                 std::cout << "\t * The Eigen::SparseLU solver failed to factorize the A matrix!" << std::endl;
+            m_clock.start();
             m_pMesh->restoreNodesList();
+            m_accumalatedTimes["Save/restore nodelist"] += m_clock.end();
             return false;
         }
     },
     [&](const auto& qIterVec, const auto& qIterPrevVec) -> double {
+        m_clock.start();
         double num = 0, den = 0;
         Mesh* p_Mesh = this->m_pMesh;
 
@@ -298,9 +325,12 @@ void MomContEqIncompNewton::m_setupPicardPSPG(unsigned int maxIter, double minRe
             }
         }
 
+        double res;
         if(den == 0)
-            return std::numeric_limits<double>::max();
-
-        return std::sqrt(num/den);
+            res = std::numeric_limits<double>::max();
+        else
+            res = std::sqrt(num/den);
+        m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
+        return res;
     }, maxIter, minRes);
 }

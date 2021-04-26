@@ -2,9 +2,11 @@
 #ifndef EQUATION_HPP_INCLUDED
 #define EQUATION_HPP_INCLUDED
 
+#include <map>
 #include <vector>
 #include <Eigen/Dense>
 
+#include "utility/Clock.hpp"
 #include "utility/SolTable.hpp"
 #include "matricesBuilder/MatricesBuilder.hpp"
 
@@ -37,6 +39,9 @@ class SIMULATION_API Equation
 
         /// \brief Display general parameters of the equation.
         virtual void displayParams() const;
+
+        /// \brief Display time statistics.
+        void displayTimeStats() const;
 
         /// \param thread the OpenMP thread which might be calling this function.
         /// \return The underlying boundary conditions parameters.
@@ -73,6 +78,9 @@ class SIMULATION_API Equation
         Problem* m_pProblem;    /**< Pointer to the underlying problem. */
         Solver* m_pSolver;      /**< Pointer to the underlying solver. */
         Mesh* m_pMesh;          /**< Pointer to the mesh used. */
+
+        std::map<std::string, double> m_accumalatedTimes;  /**< Accumulated time in each part of the solver*/
+        Clock m_clock;
 
         std::unique_ptr<MatrixBuilder> m_pMatBuilder; /**< Class responsible of building the required matrices. */
 };

@@ -10,17 +10,20 @@ Problem(luaFilePath)
     if(m_id != "WCompNewtonNoT" && m_id != "BoussinesqWC")
         throw std::runtime_error("the ProbWCompNewton does not know id " + m_id);
 
+    std::cout << "Loading solver" << std::flush;
+    m_pSolver = std::make_unique<SolverWCompNewton>(this, m_pMesh.get(), m_problemParams);
+    std::cout << "\rLoading solver\t\t\tok" << std::endl;
+
     if(m_id == "WCompNewtonNoT")
         m_statesNumber = 2*m_pMesh->getDim() + 2;
     else if(m_id == "BoussinesqWC")
         m_statesNumber = 2*m_pMesh->getDim() + 3;
 
+    m_statesNumber += m_pSolver->getAdditionalStateCount();
+
     m_pMesh->setStatesNumber(m_statesNumber);
     addExtractors();
     setInitialCondition();
-    std::cout << "Loading solver" << std::flush;
-    m_pSolver = std::make_unique<SolverWCompNewton>(this, m_pMesh.get(), m_problemParams);
-    std::cout << "\rLoading solver\t\t\tok" << std::endl;
 }
 
 ProbWCompNewton::~ProbWCompNewton()
@@ -40,21 +43,40 @@ void ProbWCompNewton::displayParams() const
 
 std::vector<std::string> ProbWCompNewton::getWrittableDataName() const
 {
+    std::vector<std::string> writtableDataName;
+
     if(m_pMesh->getDim() == 2)
     {
         if(m_id == "WCompNewtonNoT")
-            return {"u", "v", "p", "rho", "ax", "ay", "ke", "magV", "velocity"};
+        {
+            writtableDataName = {"u", "v", "p", "rho", "ax", "ay", "ke", "magV", "velocity"};
+            if(m_pSolver->getID() == "CDS_FIC")
+                writtableDataName.push_back("prevRho");
+        }
         else if(m_id == "BoussinesqWC")
-            return {"u", "v", "p", "rho", "ax", "ay", "T", "ke", "magV", "velocity"};
+        {
+            writtableDataName = {"u", "v", "p", "rho", "ax", "ay", "T", "ke", "magV", "velocity"};
+            if(m_pSolver->getID() == "CDS_FIC")
+                writtableDataName.push_back("prevRho");
+        }
     }
     else
-    {   if(m_id == "WCompNewtonNoT")
-            return {"u", "v", "w", "p", "rho", "ax", "ay", "az", "ke", "magV", "velocity"};
+        {
+        if(m_id == "WCompNewtonNoT")
+        {
+            writtableDataName = {"u", "v", "w", "p", "rho", "ax", "ay", "az", "ke", "magV", "velocity"};
+            if(m_pSolver->getID() == "CDS_FIC")
+                writtableDataName.push_back("prevRho");
+        }
         else if(m_id == "BoussinesqWC")
-            return {"u", "v", "w", "p", "rho", "ax", "ay", "az", "T", "ke", "magV", "velocity"};
+        {
+            writtableDataName = {"u", "v", "w", "p", "rho", "ax", "ay", "az", "T", "ke", "magV", "velocity"};
+            if(m_pSolver->getID() == "CDS_FIC")
+                writtableDataName.push_back("prevRho");
+        }
     }
 
-    return {};
+    return writtableDataName;
 }
 
 std::vector<double> ProbWCompNewton::getWrittableData(const std::string& name, std::size_t nodeIndex) const
@@ -87,6 +109,8 @@ std::vector<double> ProbWCompNewton::getWrittableData(const std::string& name, s
                     return {std::sqrt(node.getState(0)*node.getState(0) + node.getState(1)*node.getState(1))};
                 else if(name == "velocity")
                     return {node.getState(0), node.getState(1), 0};
+                else if(name == "prevRho" && m_pSolver->getID() == "CDS_FIC")
+                    return {node.getState(6)};
                 else
                     error = true;
 
@@ -111,6 +135,8 @@ std::vector<double> ProbWCompNewton::getWrittableData(const std::string& name, s
                     return {std::sqrt(node.getState(0)*node.getState(0) + node.getState(1)*node.getState(1) + node.getState(2)*node.getState(2))};
                 else if(name == "velocity")
                     return {node.getState(0), node.getState(1), node.getState(2)};
+                else if(name == "prevRho" && m_pSolver->getID() == "CDS_FIC")
+                    return {node.getState(8)};
                 else
                     error = true;
             }
@@ -142,6 +168,8 @@ std::vector<double> ProbWCompNewton::getWrittableData(const std::string& name, s
                     return {std::sqrt(node.getState(0)*node.getState(0) + node.getState(1)*node.getState(1))};
                 else if(name == "velocity")
                     return {node.getState(0), node.getState(1), 0};
+                else if(name == "prevRho" && m_pSolver->getID() == "CDS_FIC")
+                    return {node.getState(7)};
                 else
                     error = true;
 
@@ -168,6 +196,8 @@ std::vector<double> ProbWCompNewton::getWrittableData(const std::string& name, s
                     return {std::sqrt(node.getState(0)*node.getState(0) + node.getState(1)*node.getState(1) + node.getState(2)*node.getState(2))};
                 else if(name == "velocity")
                     return {node.getState(0), node.getState(1), node.getState(2)};
+                else if(name == "prevRho" && m_pSolver->getID() == "CDS_FIC")
+                    return {node.getState(9)};
                 else
                     error = true;
             }

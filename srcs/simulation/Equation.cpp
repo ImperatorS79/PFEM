@@ -1,5 +1,9 @@
 #include "Equation.hpp"
+
+#include <iomanip>
+
 #include "Problem.hpp"
+
 
 Equation::Equation(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
                  std::vector<SolTable> solverParams, std::vector<SolTable> materialParams,
@@ -44,6 +48,17 @@ Equation::~Equation()
 void Equation::displayParams() const
 {
     throw std::runtime_error("Unimplemented function by the child class -> Equation::displayParams()");
+}
+
+void Equation::displayTimeStats() const
+{
+    std::cout << getID() << " stats" << std::endl;
+    std::cout << "--------------------------------------" << std::endl;
+
+    for(auto& keyPair : m_accumalatedTimes)
+    {
+        std::cout << std::defaultfloat << std::setprecision(7) <<  std::setw(40) << std::left << keyPair.first << ": " << std::setw(10) << std::right << keyPair.second << " s" << std::endl;
+    }
 }
 
 SolTable Equation::getBCParam(unsigned int thread) const

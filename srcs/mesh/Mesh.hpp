@@ -4,6 +4,7 @@
 
 #include <string>
 #include <map>
+#include <Eigen/Dense>
 
 #include "Node.hpp"
 #include "Element.hpp"
@@ -189,13 +190,15 @@ class MESH_API Mesh
          * \brief Update the nodes position.
          * \param deltaPos The variation of the coordinate.
          */
-        void updateNodesPosition(std::vector<double> deltaPos);
+        void updateNodesPosition(const std::vector<double>& deltaPos);
+        void updateNodesPosition(const Eigen::VectorXd& deltaPos);
 
         /**
          * \brief Update the nodes position (from the saved nodeS List).
          * \param deltaPos The variation of the coordinate.
          */
-        void updateNodesPositionFromSave(std::vector<double> deltaPos);
+        void updateNodesPositionFromSave(const std::vector<double>& deltaPos);
+        void updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos);
 
     private:
         double m_hchar; /**< Characteristic size of an element (same as in .geo file). */

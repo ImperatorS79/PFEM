@@ -121,23 +121,34 @@ bool MomEqWCompNewton::solve()
     if(m_pProblem->isOutputVerbose())
         std::cout << "Momentum Equation" << std::endl;
 
+    m_clock.start();
     Eigen::VectorXd qV1half = getQFromNodesStates(m_pMesh, m_statesIndex[0], m_statesIndex[0] + m_pMesh->getDim() - 1);
+    m_accumalatedTimes["Update solutions"] += m_clock.end();
+    m_clock.start();
     Eigen::DiagonalMatrix<double,Eigen::Dynamic> invM; //The mass matrix for momentum equation.
     Eigen::VectorXd F;                                  //The rhs of the momentum equation.
+    m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
 
     m_buildSystem(invM, F);
+    m_clock.start();
     m_applyBC(invM, F);
+    m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
+    m_clock.start();
     Eigen::VectorXd qAcc = invM*F;
+    m_accumalatedTimes["Solve system"] += m_clock.end();
 
+    m_clock.start();
     Eigen::VectorXd qV = qV1half + 0.5*m_pSolver->getTimeStep()*qAcc;
     setNodesStatesfromQ(m_pMesh, qV, m_statesIndex[0], m_statesIndex[0] + m_pMesh->getDim() - 1);
     setNodesStatesfromQ(m_pMesh, qAcc, m_statesIndex[1], m_statesIndex[1] + m_pMesh->getDim() - 1);
+    m_accumalatedTimes["Update solutions"] += m_clock.end();
 
     return true;
 }
 
 void MomEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F)
 {
+    m_clock.start();
     const unsigned short dim = m_pMesh->getDim();
     const std::size_t elementsCount = m_pMesh->getElementsCount();
     const std::size_t nodesCount = m_pMesh->getNodesCount();
@@ -145,16 +156,13 @@ void MomEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic
 
     invM.resize(dim*nodesCount); invM.setZero();
     std::vector<Eigen::MatrixXd> Me(elementsCount);
-    for(auto& mat: Me)
-        mat.resize(dim*noPerEl, dim*noPerEl);
 
     F.resize(dim*nodesCount); F.setZero();
     std::vector<Eigen::VectorXd> FTote(elementsCount);
-    for(auto& vec: FTote)
-        vec.resize(dim*noPerEl);
 
-    Clock aClock;
-    aClock.start();
+    m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
+
+    m_clock.start();
     Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
     for(std::size_t elm = 0 ; elm < elementsCount ; ++elm)
@@ -191,7 +199,9 @@ void MomEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic
         FTote[elm] = -Ke*V + De.transpose()*P + Fe;
     }
     Eigen::setNbThreads(m_pProblem->getThreadCount());
+    m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
+    m_clock.start();
     auto& invMDiag = invM.diagonal();
 
     for(std::size_t elm = 0 ; elm < elementsCount ; ++elm)
@@ -216,6 +226,7 @@ void MomEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic
     }
 
     MatrixBuilder::inverse(invM);
+    m_accumalatedTimes["Assemble matrix"] += m_clock.end();
 }
 
 void MomEqWCompNewton::m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F)
@@ -228,8 +239,10 @@ void MomEqWCompNewton::m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& i
     auto& invMDiag = invM.diagonal();
 
     //Do not parallelize this
+    #pragma omp parallel for default(shared) schedule(dynamic)
     for (std::size_t n = 0 ; n < nodesCount ; ++n)
     {
+        int threadIndex = omp_get_thread_num();
         const Node& node = m_pMesh->getNode(n);
 
         if(node.isFree() && !node.isBound())
@@ -245,7 +258,7 @@ void MomEqWCompNewton::m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& i
             if(node.getFlag(m_bcFlags[0]))
             {
                 std::vector<double> result;
-                result = m_bcParams[0].call<std::vector<double>>(m_pMesh->getNodeType(n) + "V",
+                result = m_bcParams[threadIndex].call<std::vector<double>>(m_pMesh->getNodeType(n) + "V",
                                                         node.getPosition(),
                                                         m_pMesh->getBoundNodeInitPos(n),
                                                         m_pProblem->getCurrentSimTime() +

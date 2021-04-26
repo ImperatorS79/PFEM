@@ -14,7 +14,7 @@ Solver(pProblem, pMesh, problemParams)
     if(m_pProblem->getID() != "WCompNewtonNoT" && m_pProblem->getID() != "BoussinesqWC")
         throw std::runtime_error("this solver cannot be used with problem whose id is " + m_pProblem->getID());
 
-    if(m_id != "CDS_Meduri")
+    if(m_id != "CDS_Meduri" && m_id != "CDS_FIC")
         throw std::runtime_error("this solver does not know id " + m_id);
 
     //Load material params for equations
@@ -156,6 +156,11 @@ void SolverWCompNewton::displayParams() const
         pEquation->displayParams();
 }
 
+std::size_t SolverWCompNewton::getAdditionalStateCount() const
+{
+    return (m_id == "CDS_FIC") ? 1 : 0;
+}
+
 bool SolverWCompNewton::solveOneTimeStep()
 {
     return m_solveFunc();
@@ -166,6 +171,7 @@ void SolverWCompNewton::computeNextDT()
     if(m_adaptDT)
     {
         m_timeStep = std::numeric_limits<double>::max();
+        #pragma omp parallel for reduction(min:m_timeStep)
         for(std::size_t elm = 0 ; elm < m_pMesh->getElementsCount() ; ++elm)
         {
             const Element& element = m_pMesh->getElement(elm);
@@ -192,55 +198,81 @@ void SolverWCompNewton::computeNextDT()
 
 bool SolverWCompNewton::m_solveWCompNewtonNoT()
 {
+    m_clock.start();
     unsigned int dim = m_pMesh->getDim();
     Eigen::VectorXd qVPrev = getQFromNodesStates(m_pMesh, 0, dim - 1);           //The precedent speed.
     Eigen::VectorXd qAccPrev = getQFromNodesStates(m_pMesh, dim + 2, 2*dim + 1);  //The precedent acceleration.
+    m_accumalatedTimes["Update solutions"] += m_clock.end();
 
+    m_clock.start();
     m_pEquations[0]->preCompute();
+    m_accumalatedTimes["Solving continuity eq"] += m_clock.end();
 
+    m_clock.start();
     Eigen::VectorXd qV1half = qVPrev + 0.5*m_timeStep*qAccPrev;
 
     setNodesStatesfromQ(m_pMesh, qV1half, 0, dim - 1);
     Eigen::VectorXd deltaPos = qV1half*m_timeStep;
-    m_pMesh->updateNodesPosition(std::vector<double> (deltaPos.data(), deltaPos.data() + deltaPos.cols()*deltaPos.rows()));
+    m_pMesh->updateNodesPosition(deltaPos);
+    m_accumalatedTimes["Update solutions"] += m_clock.end();
 
+    m_clock.start();
     m_pEquations[0]->solve();
+    m_accumalatedTimes["Solving continuity eq"] += m_clock.end();
+    m_clock.start();
     m_pEquations[1]->solve();
+    m_accumalatedTimes["Solving momentum eq"] += m_clock.end();
 
+    m_clock.start();
     m_pProblem->updateTime(m_timeStep);
     if(m_pProblem->getCurrentSimTime() > m_nextTimeToRemesh)
     {
         m_pMesh->remesh(m_pProblem->isOutputVerbose());
         m_nextTimeToRemesh += m_maxDT;
     }
+    m_accumalatedTimes["Remeshing"] += m_clock.end();
 
     return true;
 }
 
 bool SolverWCompNewton::m_solveBoussinesqWC()
 {
+    m_clock.start();
     unsigned int dim = m_pMesh->getDim();
     Eigen::VectorXd qVPrev = getQFromNodesStates(m_pMesh, 0, dim - 1);           //The precedent speed.
     Eigen::VectorXd qAccPrev = getQFromNodesStates(m_pMesh, dim + 2, 2*dim + 1);  //The precedent acceleration.
+    m_accumalatedTimes["Update solutions"] += m_clock.end();
 
+    m_clock.start();
     m_pEquations[0]->preCompute();
+    m_accumalatedTimes["Solving continuity eq"] += m_clock.end();
 
+    m_clock.start();
     Eigen::VectorXd qV1half = qVPrev + 0.5*m_timeStep*qAccPrev;
 
     setNodesStatesfromQ(m_pMesh, qV1half, 0, dim - 1);
     Eigen::VectorXd deltaPos = qV1half*m_timeStep;
     m_pMesh->updateNodesPosition(std::vector<double> (deltaPos.data(), deltaPos.data() + deltaPos.cols()*deltaPos.rows()));
+    m_accumalatedTimes["Update solutions"] += m_clock.end();
 
+    m_clock.start();
     m_pEquations[2]->solve();
+    m_accumalatedTimes["Solving heat eq"] += m_clock.end();
+    m_clock.start();
     m_pEquations[0]->solve();
+    m_accumalatedTimes["Solving continuity eq"] += m_clock.end();
+    m_clock.start();
     m_pEquations[1]->solve();
+    m_accumalatedTimes["Solving momentum eq"] += m_clock.end();
 
+    m_clock.start();
     m_pProblem->updateTime(m_timeStep);
     if(m_pProblem->getCurrentSimTime() > m_nextTimeToRemesh)
     {
         m_pMesh->remesh(m_pProblem->isOutputVerbose());
         m_nextTimeToRemesh += m_maxDT;
     }
+    m_accumalatedTimes["Remeshing"] += m_clock.end();
 
     return true;
 }

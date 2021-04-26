@@ -198,12 +198,16 @@ void SolverIncompNewton::computeNextDT()
 
 bool SolverIncompNewton::m_solveIncompNewtonNoT()
 {
+    m_clock.start();
     m_solveSucceed = m_pEquations[0]->solve();
+    m_accumalatedTimes["Solving momentum continuity equation"] += m_clock.end();
 
     if(m_solveSucceed)
     {
+        m_clock.start();
         m_pProblem->updateTime(m_timeStep);
         m_pMesh->remesh(m_pProblem->isOutputVerbose());
+        m_accumalatedTimes["Remeshing"] += m_clock.end();
     }
 
     return m_solveSucceed;
@@ -211,26 +215,36 @@ bool SolverIncompNewton::m_solveIncompNewtonNoT()
 
 bool SolverIncompNewton::m_solveBoussinesq()
 {
-    if(m_solveHeatFirst && !m_pEquations[1]->solve())
+    if(m_solveHeatFirst)
     {
-        m_solveSucceed = false;
-        return m_solveSucceed;
+        m_clock.start();
+        m_solveSucceed = m_pEquations[1]->solve();
+        m_accumalatedTimes["Solving heat equation"] += m_clock.end();
+        if(!m_solveSucceed)
+            return m_solveSucceed;
     }
 
+    m_clock.start();
     m_solveSucceed = m_pEquations[0]->solve();
+    m_accumalatedTimes["Solving momentum continuity equation"] += m_clock.end();
     if(!m_solveSucceed)
         return m_solveSucceed;
 
-    if(!m_solveHeatFirst && !m_pEquations[1]->solve())
+    if(!m_solveHeatFirst)
     {
-        m_solveSucceed = false;
-        return m_solveSucceed;
+        m_clock.start();
+        m_solveSucceed = m_pEquations[1]->solve();
+        m_accumalatedTimes["Solving heat equation"] += m_clock.end();
+        if(!m_solveSucceed)
+            return m_solveSucceed;
     }
 
     if(m_solveSucceed)
     {
+        m_clock.start();
         m_pProblem->updateTime(m_timeStep);
         m_pMesh->remesh(m_pProblem->isOutputVerbose());
+        m_accumalatedTimes["Remeshing"] += m_clock.end();
     }
 
     return m_solveSucceed;
@@ -238,7 +252,9 @@ bool SolverIncompNewton::m_solveBoussinesq()
 
 bool SolverIncompNewton::m_solveConduction()
 {
+    m_clock.start();
     m_solveSucceed = m_pEquations[0]->solve();
+    m_accumalatedTimes["Solving heat equation"] += m_clock.end();
 
     if(m_solveSucceed)
         m_pProblem->updateTime(m_timeStep);

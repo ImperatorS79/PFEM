@@ -25,8 +25,13 @@ class NonLinearAlgo
 
         virtual void displayParams();
         virtual bool solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec, bool verboseOutput);
+        void runOnlyOnce(bool runOnce)
+        {
+            m_runOnce = runOnce;
+        }
 
     protected:
+        bool m_runOnce = false;
         std::function<void(const std::vector<Eigen::VectorXd>&)> m_prepare;
 
         std::function<bool(std::vector<Eigen::VectorXd>&,

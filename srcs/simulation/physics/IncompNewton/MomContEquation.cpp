@@ -185,13 +185,17 @@ bool MomContEqIncompNewton::solve()
 
     if(m_pSolver->getID() == "PSPG")
     {
+        m_clock.start();
         std::vector<Eigen::VectorXd> qPrev = {getQFromNodesStates(m_pMesh, m_statesIndex[0], m_statesIndex[0] + m_pMesh->getDim())};
+        m_accumalatedTimes["Update solutions"] += m_clock.end();
         return m_pPicardAlgo->solve(m_pMesh, qPrev, m_pProblem->isOutputVerbose());
     }
     else if(m_pSolver->getID() == "FracStep")
     {
+        m_clock.start();
         std::vector<Eigen::VectorXd> qPrev = {getQFromNodesStates(m_pMesh, m_statesIndex[0], m_statesIndex[0] + m_pMesh->getDim() - 1),
                                               getQFromNodesStates(m_pMesh, m_pMesh->getDim(), m_pMesh->getDim())};
+        m_accumalatedTimes["Update solutions"] += m_clock.end();
         return m_pPicardAlgo->solve(m_pMesh, qPrev, m_pProblem->isOutputVerbose());
     }
 

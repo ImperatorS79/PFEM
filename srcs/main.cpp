@@ -33,7 +33,6 @@ int main(int argc, char **argv)
 
         luaFile.close();
 
-        //hack
         sol::state state;
         auto res = state.safe_script_file(argv[1]);
         if(!res.valid())
@@ -56,21 +55,25 @@ int main(int argc, char **argv)
             throw std::runtime_error("unknown problem type " + problemType + "!");
 
         pProblem->simulate();
+        std::cout << "======================================" << std::endl;
+        std::cout << "======================================" << std::endl;
+        pProblem->displayTimeStats();
     }
     catch(const std::exception& e)
     {
-        std::cerr << "Something went wrong while running the program: " << e.what() << std::endl;
+        std::cerr << std::endl << "\nSomething went wrong while running the program: " << e.what() << std::endl;
         pProblem->dump();
         return -1;
     }
     catch(...)
     {
-        std::cerr << "An unknown exception has occurred." << std::endl;
+        std::cerr << std::endl << "\nAn unknown exception has occurred." << std::endl;
         pProblem->dump();
         return -1;
     }
 
     myClock.end();
+    std::cout << "======================================" << std::endl;
     myClock.displayDT("Ellapsed time for simulation: ");
 
     return 0;

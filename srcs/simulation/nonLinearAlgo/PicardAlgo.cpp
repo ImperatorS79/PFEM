@@ -46,7 +46,7 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
 
     while(res > m_minRes)
     {
-        if(verboseOutput)
+        if(verboseOutput && !m_runOnce)
         {
             std::cout << " - Picard algorithm (mesh position) - iteration ("
                       << iterCount << ")" << std::endl;
@@ -59,7 +59,7 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
 
         res = m_computeRes(qIterVec, qIterPrevVec);
 
-        if(verboseOutput)
+        if(verboseOutput && !m_runOnce)
             std::cout << "\t * Relative 2-norm of q: " << res << " vs "
                       << m_minRes << std::endl;
 
@@ -68,7 +68,7 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
 
         if(iterCount > m_maxIter)
         {
-            if(verboseOutput)
+            if(verboseOutput && !m_runOnce)
             {
                 std::cout << "\t * Iteration count " << iterCount
                       << " greater than maximum: " << m_maxIter << std::endl;
@@ -86,6 +86,9 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
             pMesh->restoreNodesList();
             return false;
         }
+
+        if(m_runOnce)
+            break;
     }
 
     return true;

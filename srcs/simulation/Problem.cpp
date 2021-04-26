@@ -82,6 +82,19 @@ void Problem::displayParams() const
     throw std::runtime_error("Unimplemented function by the child class -> Problem::displayParams()");
 }
 
+void Problem::displayTimeStats() const
+{
+    std::cout << "Time stats" << std::endl;
+    std::cout << "======================================" << std::endl;
+
+    for(auto& keyPair : m_accumalatedTimes)
+    {
+        std::cout << std::defaultfloat << std::setprecision(7) <<  std::setw(40) << std::left << keyPair.first << ": " << std::setw(10) << std::right << keyPair.second << " s" << std::endl;
+    }
+
+    m_pSolver->displayTimeStats();
+}
+
 void Problem::dump()
 {
     for(auto& pExtractor : m_pExtractors)
@@ -285,10 +298,12 @@ void Problem::simulate()
 
     std::cout << std::string(40, '-') << std::endl;
 
+    m_clock.start();
     for(auto& pExtractor : m_pExtractors)
     {
         pExtractor->update(false);
     }
+    m_accumalatedTimes["Extract data"] += m_clock.end();
 
     while(m_time < m_maxTime)
     {
@@ -315,23 +330,29 @@ void Problem::simulate()
 
         if(ok)
         {
+            m_clock.start();
             for(auto& pExtractor : m_pExtractors)
             {
                 pExtractor->update(false);
             }
+            m_accumalatedTimes["Extract data"] += m_clock.end();
         }
 
         if(g_shouldClose == 1)
         {
+            m_clock.start();
             for(auto& pExtractor : m_pExtractors)
             {
                 pExtractor->update(true);
             }
+            m_accumalatedTimes["Extract data"] += m_clock.end();
 
             break;
         }
 
+        m_clock.start();
         m_pSolver->computeNextDT();
+        m_accumalatedTimes["Compute next dt"] += m_clock.end();
 
         if(m_pSolver->getTimeStep() < 1e-20)
             throw std::runtime_error("time step reached nearly zero!");

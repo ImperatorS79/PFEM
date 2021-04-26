@@ -954,10 +954,10 @@ void Mesh::triangulateAlphaShape()
         triangulateAlphaShape3D();
 }
 
-void Mesh::updateNodesPosition(std::vector<double> deltaPos)
+void Mesh::updateNodesPosition(const std::vector<double>& deltaPos)
 {
     if(deltaPos.size() != m_nodesList.size()*m_dim)
-        throw std::runtime_error("invalid size of the deltaPos vector");
+        throw std::runtime_error("invalid size of the deltaPos vector: " + std::to_string(deltaPos.size()) + " VS " + std::to_string(m_nodesListSave.size()*m_dim));
 
     #pragma omp parallel for default(shared)
     for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
@@ -990,12 +990,86 @@ void Mesh::updateNodesPosition(std::vector<double> deltaPos)
     computeFSNormalCurvature();
 }
 
-void Mesh::updateNodesPositionFromSave(std::vector<double> deltaPos)
+void Mesh::updateNodesPosition(const Eigen::VectorXd& deltaPos)
+{
+    if(static_cast<std::size_t>(deltaPos.rows()) < m_nodesList.size()*m_dim)
+        throw std::runtime_error("invalid size of the deltaPos vector: " + std::to_string(deltaPos.rows()) + " VS " + std::to_string(m_nodesListSave.size()*m_dim));
+
+    #pragma omp parallel for default(shared)
+    for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
+    {
+        if(!m_nodesList[n].m_isFixed)
+        {
+            for(unsigned short d = 0 ; d < m_dim ; ++d)
+            {
+                m_nodesList[n].m_position[d] += deltaPos[n + d*m_nodesList.size()];
+            }
+        }
+    }
+
+    #pragma omp parallel for default(shared)
+    for(std::size_t elm = 0 ; elm < m_elementsList.size() ; ++elm)
+    {
+        m_elementsList[elm].computeJ();
+        m_elementsList[elm].computeDetJ();
+        m_elementsList[elm].computeInvJ();
+    }
+
+    #pragma omp parallel for default(shared)
+    for(std::size_t facet = 0 ; facet < m_facetsList.size() ; ++facet)
+    {
+        m_facetsList[facet].computeJ();
+        m_facetsList[facet].computeDetJ();
+        m_facetsList[facet].computeInvJ();
+    }
+
+    computeFSNormalCurvature();
+}
+
+void Mesh::updateNodesPositionFromSave(const std::vector<double>& deltaPos)
 {
     if(m_nodesListSave.empty())
         throw std::runtime_error("you did not save the nodes list!");
     else if(deltaPos.size() != m_nodesListSave.size()*m_dim)
-        throw std::runtime_error("invalid size of the deltaPos vector");
+        throw std::runtime_error("invalid size of the deltaPos vector: " + std::to_string(deltaPos.size()) + " VS " + std::to_string(m_nodesListSave.size()*m_dim));
+
+    #pragma omp parallel for default(shared)
+    for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)
+    {
+        if(!m_nodesList[n].m_isFixed)
+        {
+            for(unsigned short d = 0 ; d < m_dim ; ++d)
+            {
+                m_nodesList[n].m_position[d] = m_nodesListSave[n].m_position[d] + deltaPos[n + d*m_nodesList.size()];
+            }
+        }
+    }
+
+    #pragma omp parallel for default(shared)
+    for(std::size_t elm = 0 ; elm < m_elementsList.size() ; ++elm)
+    {
+        m_elementsList[elm].computeJ();
+        m_elementsList[elm].computeDetJ();
+        m_elementsList[elm].computeInvJ();
+    }
+
+    #pragma omp parallel for default(shared)
+    for(std::size_t facet = 0 ; facet < m_facetsList.size() ; ++facet)
+    {
+        m_facetsList[facet].computeJ();
+        m_facetsList[facet].computeDetJ();
+        m_facetsList[facet].computeInvJ();
+    }
+
+    computeFSNormalCurvature();
+}
+
+void Mesh::updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos)
+{
+    if(m_nodesListSave.empty())
+        throw std::runtime_error("you did not save the nodes list!");
+    else if(static_cast<std::size_t>(deltaPos.rows()) < m_nodesListSave.size()*m_dim)
+        throw std::runtime_error("invalid size of the deltaPos vector: " + std::to_string(deltaPos.rows()) + " VS " + std::to_string(m_nodesListSave.size()*m_dim));
 
     #pragma omp parallel for default(shared)
     for(std::size_t n = 0 ; n < m_nodesList.size() ; ++n)

@@ -18,14 +18,13 @@ class SIMULATION_API SolverWCompNewton: public Solver
 
         bool solveOneTimeStep() override;
         void computeNextDT() override;
+        std::size_t getAdditionalStateCount() const override;
 
     protected:
         bool m_adaptDT;
 		double m_securityCoeff;
 		double m_maxDT;
 		double m_initialDT;
-
-		double m_nextTimeToRemesh;
 
 		std::function<bool()> m_solveFunc;
 		bool m_solveWCompNewtonNoT();
