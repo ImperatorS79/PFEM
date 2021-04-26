@@ -33,13 +33,13 @@ if [ ! -d "sol" ]; then
   cd ../
 fi
 
-if [ ! -d "gmsh-4.7.1-Linux64-sdk" ]; then
-  wget http://gmsh.info/bin/Linux/gmsh-4.7.1-Linux64-sdk.tgz
-  tar -xf gmsh-4.7.1-Linux64-sdk.tgz 
-  rm -rf gmsh-4.7.1-Linux64-sdk.tgz 
+if [ ! -d "gmsh-4.8.3-Linux64-sdk" ]; then
+  wget http://gmsh.info/bin/Linux/gmsh-4.8.3-Linux64-sdk.tgz
+  tar -xf gmsh-4.8.3-Linux64-sdk.tgz 
+  rm -rf gmsh-4.8.3-Linux64-sdk.tgz 
 fi
 
-export GMSHSDK=${PWD}/gmsh-4.7.1-Linux64-sdk/
+export GMSHSDK=${PWD}/gmsh-4.8.3-Linux64-sdk/
 export SOLSDK=${PWD}
 export LUASDK=${PWD}/lua/
 export PATH=${GMSHSDK}/bin:${GMSHSDK}/lib:${LUASDK}/bin:${LUASDK}/lib"${PATH}"

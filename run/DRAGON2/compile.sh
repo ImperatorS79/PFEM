@@ -6,10 +6,10 @@ module load CGAL/4.11.1-foss-2018b-Python-2.7.15
 
 cd ../../
 
-if [ ! -d "gmsh-4.5.4-Linux64-sdk" ]; then
-  wget http://gmsh.info/bin/Linux/gmsh-4.5.4-Linux64-sdk.tgz
-  tar -xf gmsh-4.5.4-Linux64-sdk.tgz 
-  rm -rf gmsh-4.5.4-Linux64-sdk.tgz 
+if [ ! -d "gmsh-4.8.3-Linux64-sdk" ]; then
+  wget http://gmsh.info/bin/Linux/gmsh-4.8.3-Linux64-sdk.tgz
+  tar -xf gmsh-4.8.3-Linux64-sdk.tgz 
+  rm -rf gmsh-4.8.3-Linux64-sdk.tgz 
 fi
 
 if [ ! -d "eigen-eigen-323c052e1731" ]; then
@@ -27,7 +27,7 @@ if [ ! -d "nlohmann" ]; then
   rm -rf include
 fi
 
-export GMSHSDK=${PWD}/gmsh-4.5.4-Linux64-sdk/
+export GMSHSDK=${PWD}/gmsh-4.8.3-Linux64-sdk/
 export EIGENSDK=${PWD}/eigen-eigen-323c052e1731/
 export JSONSDK=${PWD}/nlohmann/:
 
