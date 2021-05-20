@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-2, -2, -2, 2, 2, 2},
+		exclusionZones = {},
 		mshFile = "examples/3D/cubeToSphere/geometry.msh"
 	},
 	
@@ -46,6 +47,7 @@ Problem = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, 0, 0},
+			computePres = false,
 			BC = {
 
 			}

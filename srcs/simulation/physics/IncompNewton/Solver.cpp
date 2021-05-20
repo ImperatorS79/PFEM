@@ -3,12 +3,17 @@
 #include "MomContEquation.hpp"
 #include "HeatEquation.hpp"
 
+#define REGISTER_EQ(Eq, dim) \
+std::make_unique<Eq<dim>>( \
+    m_pProblem, this, m_pMesh, m_solverParams, materialParams, \
+    bcFlags, statesIndex \
+); \
 
 SolverIncompNewton::SolverIncompNewton(Problem* pProblem, Mesh* pMesh, std::vector<SolTable> problemParams):
 Solver(pProblem, pMesh, problemParams)
 {
     //Check if the asked problem and solver are supported
-    if(m_pProblem->getID() != "IncompNewtonNoT" && m_pProblem->getID() != "Boussinesq" && m_pProblem->getID() != "Conduction")
+    if(m_pProblem->getID() != "IncompNewtonNoT" && m_pProblem->getID() != "Bingham" && m_pProblem->getID() != "Boussinesq" && m_pProblem->getID() != "Conduction")
         throw std::runtime_error("this solver cannot be used with problem whose id is " + m_pProblem->getID());
 
     if(m_id != "PSPG" && m_id != "FracStep")
@@ -22,17 +27,17 @@ Solver(pProblem, pMesh, problemParams)
     //Load equations depending of the problem
     std::vector<unsigned short> bcFlags;
     std::vector<unsigned int> statesIndex;
-    if(m_pProblem->getID() == "IncompNewtonNoT")
+    if(m_pProblem->getID() == "IncompNewtonNoT" || m_pProblem->getID() == "Bingham")
     {
         //Only the momentum-continuity equation
         m_pEquations.resize(1);
 
         bcFlags = {0};
         statesIndex = {0};
-        m_pEquations[0] = std::make_unique<MomContEqIncompNewton>(
-            m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-            bcFlags, statesIndex
-        );
+        if(m_pMesh->getDim() == 2)
+            m_pEquations[0] = REGISTER_EQ(MomContEqIncompNewton, 2)
+        else
+            m_pEquations[0] = REGISTER_EQ(MomContEqIncompNewton, 3)
 
         //Set the right node flag if the boundary condition is present
         SolTable bcParam = m_pEquations[0]->getBCParam(0);
@@ -57,17 +62,17 @@ Solver(pProblem, pMesh, problemParams)
 
         bcFlags = {0};
         statesIndex = {0, static_cast<unsigned int>(m_pMesh->getDim()) + 1};
-        m_pEquations[0] = std::make_unique<MomContEqIncompNewton>(
-            m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-            bcFlags, statesIndex
-        );
+        if(m_pMesh->getDim() == 2)
+            m_pEquations[0] = REGISTER_EQ(MomContEqIncompNewton, 2)
+        else
+            m_pEquations[0] = REGISTER_EQ(MomContEqIncompNewton, 3)
 
         bcFlags = {1, 2}; //Dirichlet and Neumann
         statesIndex = {static_cast<unsigned int>(m_pMesh->getDim()) + 1};
-        m_pEquations[1] = std::make_unique<HeatEqIncompNewton>(
-            m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-            bcFlags, statesIndex
-        );
+        if(m_pMesh->getDim() == 2)
+            m_pEquations[1] = REGISTER_EQ(HeatEqIncompNewton, 2)
+        else
+            m_pEquations[1] = REGISTER_EQ(HeatEqIncompNewton, 3)
 
         //Set the right node flag if the boundary condition is present
         SolTable bcParamMomCont = m_pEquations[0]->getBCParam(0);
@@ -108,10 +113,10 @@ Solver(pProblem, pMesh, problemParams)
 
         bcFlags = {1, 2}; //Dirichlet and Neumann
         statesIndex = {0};
-        m_pEquations[0] = std::make_unique<HeatEqIncompNewton>(
-            m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-            bcFlags, statesIndex
-        );
+        if(m_pMesh->getDim() == 2)
+            m_pEquations[0] = REGISTER_EQ(HeatEqIncompNewton, 2)
+        else
+            m_pEquations[0] = REGISTER_EQ(HeatEqIncompNewton, 3)
 
         //Set the right node flag if the boundary condition is present
         SolTable bcParamHeat = m_pEquations[0]->getBCParam(0);
@@ -139,9 +144,6 @@ Solver(pProblem, pMesh, problemParams)
     }
 
     //Loading time step parametrs
-    m_adaptDT = m_solverParams[0].checkAndGet<bool>("adaptDT");
-    m_maxDT = m_solverParams[0].checkAndGet<double>("maxDT");
-    m_initialDT = m_solverParams[0].checkAndGet<double>("initialDT");
     m_coeffDTDecrease = m_solverParams[0].checkAndGet<double>("coeffDTDecrease");
     m_coeffDTincrease = m_solverParams[0].checkAndGet<double>("coeffDTincrease");
 

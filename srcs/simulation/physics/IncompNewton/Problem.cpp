@@ -7,10 +7,10 @@
 ProbIncompNewton::ProbIncompNewton(std::string luaFilePath) :
 Problem(luaFilePath)
 {
-    if(m_id != "IncompNewtonNoT" && m_id != "Boussinesq" && m_id != "Conduction")
+    if(m_id != "IncompNewtonNoT" && m_id != "Boussinesq" && m_id != "Bingham" && m_id != "Conduction")
         throw std::runtime_error("the ProbIncompNewton does not know id " + m_id);
 
-    if(m_id == "IncompNewtonNoT")
+    if(m_id == "IncompNewtonNoT" || m_id == "Bingham")
         m_statesNumber = m_pMesh->getDim() + 1;
     else if(m_id == "Boussinesq")
         m_statesNumber = m_pMesh->getDim() + 2;
@@ -44,7 +44,7 @@ std::vector<std::string> ProbIncompNewton::getWrittableDataName() const
 {
     if(m_pMesh->getDim() == 2)
     {
-        if(m_id == "IncompNewtonNoT")
+        if(m_id == "IncompNewtonNoT" || m_id == "Bingham")
             return {"u", "v", "p", "ke", "magV", "velocity"};
         else if(m_id == "Boussinesq")
             return {"u", "v", "p", "T", "ke", "magV", "velocity"};
@@ -52,7 +52,7 @@ std::vector<std::string> ProbIncompNewton::getWrittableDataName() const
             return {"T"};
     }
     else
-    {   if(m_id == "IncompNewtonNoT")
+    {   if(m_id == "IncompNewtonNoT" || m_id == "Bingham")
             return {"u", "v", "w", "p", "ke", "magV", "velocity"};
         else if(m_id == "Boussinesq")
             return {"u", "v", "w", "p", "T", "ke", "magV", "velocity"};
@@ -69,7 +69,7 @@ std::vector<double> ProbIncompNewton::getWrittableData(const std::string& name, 
 
     bool error = false;
 
-    if(m_id == "IncompNewtonNoT")
+    if(m_id == "IncompNewtonNoT" || m_id == "Bingham")
     {
         if(name == "u")
             return {node.getState(0)};

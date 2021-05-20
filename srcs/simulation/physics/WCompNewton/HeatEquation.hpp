@@ -7,7 +7,8 @@
 class Problem;
 class Mesh;
 
-class SIMULATION_API HeatEqWCompNewton : public Equation
+template<unsigned short dim>
+class HeatEqWCompNewton : public Equation
 {
     public:
         HeatEqWCompNewton(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
@@ -21,15 +22,22 @@ class SIMULATION_API HeatEqWCompNewton : public Equation
 
         void displayParams() const override;
 
-        double getSpeedEquiv(double he, const Node& node) override;
+        double getDiffusionParam(const Node& node) const override;
         bool solve() override;
 
     private:
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder;
+
         double m_k;
         double m_cv;
 
-        void m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
-        void m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
+        Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invM;
+        Eigen::VectorXd m_F;
+
+        void m_buildSystem();
+        void m_applyBC();
 };
+
+#include "HeatEquation.inl"
 
 #endif // HEATEQWCOMPNEWTON_HPP_INCLUDED

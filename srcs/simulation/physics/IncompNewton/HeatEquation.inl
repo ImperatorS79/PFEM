@@ -3,11 +3,26 @@
 #include "../../Solver.hpp"
 #include "../../utility/StatesFromToQ.hpp"
 
-HeatEqIncompNewton::HeatEqIncompNewton(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
+template<unsigned short dim>
+HeatEqIncompNewton<dim>::HeatEqIncompNewton(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
                                      std::vector<SolTable> solverParams, std::vector<SolTable> materialParams,
                                      const std::vector<unsigned short>& bcFlags, const std::vector<unsigned int>& statesIndex) :
 Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, statesIndex, "HeatEq")
 {
+    unsigned int nGPHD = 0;
+    unsigned int nGPLD = 0;
+    if constexpr (dim == 2)
+    {
+        nGPHD = 3;
+        nGPLD = 3;
+    }
+    else if constexpr (dim == 3)
+    {
+        nGPHD = 4;
+        nGPLD = 3;
+    }
+    m_pMatBuilder = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
+
     m_rho = m_materialParams[0].checkAndGet<double>("rho");
     m_k = m_materialParams[0].checkAndGet<double>("k");
     m_cv = m_materialParams[0].checkAndGet<double>("cv");
@@ -18,15 +33,18 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     if(statesIndex.size() != 1)
         throw std::runtime_error("the " + getID() + " equation require one state index describing the T state !");
 
-    m_pMatBuilder->setMcomputeFactor([&](const Element& /** element **/, const Eigen::MatrixXd& /** N **/) -> double {
+    m_pMatBuilder->setMcomputeFactor([&](const Element& /** element **/,
+                                         const NmatTypeHD<dim>& /** N **/) -> double {
         return m_rho*m_cv;
     });
 
-    m_pMatBuilder->setLcomputeFactor([&](const Element& /** element **/, const Eigen::MatrixXd& /** N **/, const Eigen::MatrixXd& /** B **/) -> double {
+    m_pMatBuilder->setLcomputeFactor([&](const Element& /** element **/,
+                                         const NmatTypeHD<dim>& /** N **/,
+                                         const BmatType<dim>& /** B **/) -> double {
         return m_k;
     });
 
-    m_pMatBuilder->setQFunc([&](const Facet& facet, const std::array<double, 3>& gp) -> Eigen::VectorXd {
+    m_pMatBuilder->setQFunc([&](const Facet& facet, const std::array<double, 3>& gp) -> Eigen::Matrix<double, dim, 1> {
         std::array<double, 3> pos = facet.getPosFromGP(gp);
         std::vector<double> result;
             result = m_bcParams[0].call<std::vector<double>>(m_pMesh->getNodeType(facet.getNodeIndex(0)) + "Q",
@@ -35,7 +53,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
                                                              m_pProblem->getCurrentSimTime() +
                                                              m_pSolver->getTimeStep());
 
-        return Eigen::VectorXd::Map(result.data(), result.size());
+        return Eigen::Matrix<double, dim, 1>::Map(result.data(), result.size());
     });
 
     unsigned int maxIter = m_equationParams[0].checkAndGet<unsigned int>("maxIter");
@@ -52,10 +70,10 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         m_accumalatedTimes["Save/restore nodeslist"] += m_clock.end();
     },
     [&](auto& qIterVec, const auto& qPrevVec){
-        m_buildAb(m_A, m_b, qPrevVec[0]);
+        m_buildAb(qPrevVec[0]);
 
         m_clock.start();
-        m_applyBC(m_A, m_b, qPrevVec[0]);
+        m_applyBC(qPrevVec[0]);
         m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
         m_clock.start();
         m_solverIt.compute(m_A);
@@ -108,15 +126,17 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
 
     m_pPicardAlgo->runOnlyOnce(true); //When k, cv independant of T, no need of Picard
 
-    m_needNormalCurv = true;
+    m_needNormalCurv = false; //hack
 }
 
-HeatEqIncompNewton::~HeatEqIncompNewton()
+template<unsigned short dim>
+HeatEqIncompNewton<dim>::~HeatEqIncompNewton()
 {
 
 }
 
-void HeatEqIncompNewton::displayParams() const
+template<unsigned short dim>
+void HeatEqIncompNewton<dim>::displayParams() const
 {
     std::cout << "Heat equation parameters:\n"
               << " * Specific heat capacity: " << m_cv << " J/(kg K)\n"
@@ -125,7 +145,8 @@ void HeatEqIncompNewton::displayParams() const
     m_pPicardAlgo->displayParams();
 }
 
-bool HeatEqIncompNewton::solve()
+template<unsigned short dim>
+bool HeatEqIncompNewton<dim>::solve()
 {
     if(m_pProblem->isOutputVerbose())
         std::cout << "Heat Equation" << std::endl;
@@ -134,18 +155,18 @@ bool HeatEqIncompNewton::solve()
     return m_pPicardAlgo->solve(m_pMesh, qPrevVec, m_pProblem->isOutputVerbose());
 }
 
-void HeatEqIncompNewton::m_buildAb(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
+template<unsigned short dim>
+void HeatEqIncompNewton<dim>::m_buildAb(const Eigen::VectorXd& qPrev)
 {
-    unsigned int dim = m_pMesh->getDim();
-    unsigned int noPerEl = m_pMesh->getNodesPerElm();
-    unsigned int tripletPerElm = (dim*noPerEl*noPerEl + dim*noPerEl*dim*noPerEl + 3*noPerEl*dim*noPerEl + noPerEl*noPerEl);
-    unsigned int doubletPerElm = (2*dim*noPerEl + 2*noPerEl);
-    std::size_t nElm = m_pMesh->getElementsCount();
-    std::size_t nNodes = m_pMesh->getNodesCount();
-    double dt = m_pSolver->getTimeStep();
+    constexpr unsigned short noPerEl = dim + 1;
+    const unsigned int tripletPerElm = (dim*noPerEl*noPerEl + dim*noPerEl*dim*noPerEl + 3*noPerEl*dim*noPerEl + noPerEl*noPerEl);
+    const unsigned int doubletPerElm = (2*dim*noPerEl + 2*noPerEl);
+    const std::size_t nElm = m_pMesh->getElementsCount();
+    const std::size_t nNodes = m_pMesh->getNodesCount();
+    const double dt = m_pSolver->getTimeStep();
 
     std::vector<Eigen::Triplet<double>> indexA(tripletPerElm*nElm);
-    std::vector<std::pair<std::size_t, double>> indexb(doubletPerElm*nElm); b.setZero();
+    std::vector<std::pair<std::size_t, double>> indexb(doubletPerElm*nElm); m_b.setZero();
 
     Eigen::setNbThreads(1);
     #pragma omp parallel for default(shared)
@@ -153,18 +174,14 @@ void HeatEqIncompNewton::m_buildAb(Eigen::SparseMatrix<double>& A, Eigen::Vector
     {
         const Element& element = m_pMesh->getElement(elm);
 
-        Eigen::MatrixXd gradNe = m_pMatBuilder->getGradN(element);
-        Eigen::MatrixXd Be = m_pMatBuilder->getB(gradNe);
-        Eigen::MatrixXd Me_dt = (1/dt)*m_pMatBuilder->getM(element);
-        Eigen::MatrixXd Le = m_pMatBuilder->getL(element, Be, gradNe);
+        auto gradNe = m_pMatBuilder->getGradN(element);
+        auto Be = m_pMatBuilder->getB(gradNe);
+        auto Me_dt = (1/dt)*m_pMatBuilder->getM(element);
+        auto Le = m_pMatBuilder->getL(element, Be, gradNe);
 
-        Eigen::VectorXd thetaPrev(noPerEl);
-         if(dim == 2)
-            thetaPrev << qPrev[element.getNodeIndex(0)], qPrev[element.getNodeIndex(1)], qPrev[element.getNodeIndex(2)];
-        else
-            thetaPrev << qPrev[element.getNodeIndex(0)], qPrev[element.getNodeIndex(1)], qPrev[element.getNodeIndex(2)], qPrev[element.getNodeIndex(3)];
+        auto thetaPrev = getElementState<dim>(qPrev, element, 0, nNodes);
 
-        Eigen::VectorXd MThetaPreve_dt = Me_dt*thetaPrev;
+        auto MThetaPreve_dt = Me_dt*thetaPrev;
 
         std::size_t countA = 0;
         std::size_t countb = 0;
@@ -223,21 +240,21 @@ void HeatEqIncompNewton::m_buildAb(Eigen::SparseMatrix<double>& A, Eigen::Vector
     /********************************************************************************
                                         Compute A and b
     ********************************************************************************/
-    A.setFromTriplets(indexA.begin(), indexA.end());
+    m_A.setFromTriplets(indexA.begin(), indexA.end());
 
     for(const auto& doublet : indexb)
     {
         //std::cout << doublet.first << ", " << doublet.second << std::endl;
-        b[doublet.first] += doublet.second;
+        m_b[doublet.first] += doublet.second;
     }
 }
 
-void HeatEqIncompNewton::m_applyBC(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
+template<unsigned short dim>
+void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
 {
     const std::size_t nodesCount = m_pMesh->getNodesCount();
-
     const std::size_t facetsCount = m_pMesh->getFacetsCount();
-    const std::size_t noPerFacet = m_pMesh->getNodesPerFacet();
+    constexpr std::size_t noPerFacet = dim;
 
     for(std::size_t f = 0 ; f < facetsCount ; ++f)
     {
@@ -254,11 +271,11 @@ void HeatEqIncompNewton::m_applyBC(Eigen::SparseMatrix<double>& A, Eigen::Vector
         if(!boundaryQ)
             continue;
 
-        Eigen::VectorXd qn = m_pMatBuilder->getQN(facet);
+        auto qn = m_pMatBuilder->getQN(facet);
 
         for(unsigned short i = 0 ; i < noPerFacet ; ++i)
         {
-            b(facet.getNodeIndex(i)) -= qn[i]; //See Galerkin formulation
+            m_b(facet.getNodeIndex(i)) -= qn[i]; //See Galerkin formulation
         }
     }
 
@@ -268,29 +285,29 @@ void HeatEqIncompNewton::m_applyBC(Eigen::SparseMatrix<double>& A, Eigen::Vector
         const Node& node = m_pMesh->getNode(n);
         if(node.isFree())
         {
-            b(n) = qPrev[n];
+            m_b(n) = qPrev[n];
         }
         else if(node.getFlag(m_bcFlags[0]))
         {
-            std::vector<double> result;
-            result = m_bcParams[0].call<std::vector<double>>(m_pMesh->getNodeType(n) + "T",
+            std::array<double, 1> result;
+            result = m_bcParams[0].call<std::array<double, 1>>(m_pMesh->getNodeType(n) + "T",
                                                              node.getPosition(),
                                                              m_pMesh->getBoundNodeInitPos(n),
                                                              m_pProblem->getCurrentSimTime() +
                                                              m_pSolver->getTimeStep());
-            b(n) = result[0];
-            for(Eigen::SparseMatrix<double>::InnerIterator it(A, n); it; ++it)
+            m_b(n) = result[0];
+            for(Eigen::SparseMatrix<double>::InnerIterator it(m_A, n); it; ++it)
             {
                 Eigen::Index row = it.row();
                 if(row == it.col())
                     continue;
 
                 double value = it.value();
-                b(row) -= value*result[0];
+                m_b(row) -= value*result[0];
                 it.valueRef() = 0;
             }
         }
     }
 
-    A.makeCompressed();
+    m_A.makeCompressed();
 }

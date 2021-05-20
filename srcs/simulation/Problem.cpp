@@ -59,6 +59,7 @@ m_step(0)
         mesh.checkAndGet<double>("gamma"),
         mesh.checkAndGet<double>("omega"),
         mesh.checkAndGet<std::vector<double>>("boundingBox"),
+        mesh.checkAndGet<std::vector<std::vector<double>>>("exclusionZones"),
         mesh.checkAndGet<std::string>("mshFile"),
         mesh.checkAndGet<bool>("addOnFS"),
         mesh.checkAndGet<bool>("deleteFlyingNodes")
@@ -180,6 +181,16 @@ std::vector<double> Problem::getMeshWrittableData(const std::string& name, std::
         throw std::runtime_error("The mesh data " + name + " cannot be extracted from the mesh");
 }
 
+std::vector<std::string> Problem::getBoundaryWrittableDataName() const
+{
+    throw std::runtime_error("Unimplemented function by the child class -> Problem::getBoundaryWrittableDataName()");
+}
+
+std::vector<double> Problem::getBoundaryWrittableData(const std::string& /** name **/, const std::string& /** boundaryName **/) const
+{
+    throw std::runtime_error("Unimplemented function by the child class -> Problem::getBoundaryWrittableData()");
+}
+
 void Problem::addExtractors()
 {
     std::cout << "Loading extractors" << std::flush;
@@ -267,6 +278,7 @@ void Problem::setInitialCondition()
             m_pMesh->setNodeIsFixed(n, isFixed);
 
             bool ok = initialCond.checkCallNoThrow("init" + m_pMesh->getNodeType(n) + "States", node.getPosition());
+
 
             if(ok)
                 result = initialCond.call<std::vector<double>>("init" + m_pMesh->getNodeType(n) + "States", node.getPosition());

@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-1, -1, -1, 1.584, 1.175, 100},
+		exclusionZones = {},
 		mshFile = "examples/3D/damBreakKoshizuka/geometry.msh"
 	},
 	

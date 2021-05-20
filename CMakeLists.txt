@@ -14,12 +14,11 @@ if(USE_MKL_WITH_TBB AND (MINGW OR MSYS))
     message(FATAL_ERROR "Unfortunately MKL cannot be used with mingw :/.")
 endif()
 
+
 # build type is "" by default in Linux
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
-
-set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 
 message(STATUS "Build Type is " ${CMAKE_BUILD_TYPE})
 

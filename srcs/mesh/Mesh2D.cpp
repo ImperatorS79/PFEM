@@ -1,18 +1,26 @@
 #include "Mesh.hpp"
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Triangulation_face_base_with_info_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Delaunay_triangulation_2.h>
 #include <CGAL/Alpha_shape_2.h>
 #include <CGAL/Alpha_shape_vertex_base_2.h>
 #include <CGAL/Alpha_shape_face_base_2.h>
 
+struct FaceInfo
+{
+    bool keep = false;
+    std::size_t index;
+};
+
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel                 Kernel;
 typedef Kernel::FT                                                          FT;
+typedef CGAL::Triangulation_face_base_with_info_2<FaceInfo, Kernel>         Fb2;
 typedef CGAL::Triangulation_vertex_base_with_info_2<std::size_t, Kernel>    Vb2;
 typedef CGAL::Alpha_shape_vertex_base_2<Kernel, Vb2>                        asVb2;
-typedef CGAL::Alpha_shape_face_base_2<Kernel>                               asFb2;
+typedef CGAL::Alpha_shape_face_base_2<Kernel, Fb2>                          asFb2;
 typedef CGAL::Triangulation_data_structure_2<asVb2,asFb2>                   asTds2;
 typedef CGAL::Delaunay_triangulation_2<Kernel,asTds2>                       asTriangulation_2;
 typedef CGAL::Alpha_shape_2<asTriangulation_2>                              Alpha_shape_2;
@@ -48,6 +56,19 @@ void Mesh::triangulateAlphaShape2D()
     auto checkFaceDeletion = [&](Alpha_shape_2::Face_handle face) -> bool
     {
         std::size_t in0 = face->vertex(0)->info(), in1 = face->vertex(1)->info(), in2 = face->vertex(2)->info();
+
+        double meanX = (m_nodesList[in0].getCoordinate(0) + m_nodesList[in1].getCoordinate(0)
+                        + m_nodesList[in2].getCoordinate(0))/3;
+
+        double meanY = (m_nodesList[in0].getCoordinate(1) + m_nodesList[in1].getCoordinate(1)
+                        + m_nodesList[in2].getCoordinate(1))/3;
+
+        for(auto& exclusionZone : m_exclusionZones)
+        {
+            if (meanX > exclusionZone[0] && meanY > exclusionZone[1] &&
+                meanX < exclusionZone[2] && meanY < exclusionZone[3])
+                return true;
+        }
 
         if(m_nodesList[in0].isBound() && m_nodesList[in1].isBound() && m_nodesList[in2].isBound())
         {
@@ -86,41 +107,77 @@ void Mesh::triangulateAlphaShape2D()
         return false;
     };
 
-    // We check for each triangle which one will be kept (alpha shape), then we
+    std::size_t counter = 0;
+    for(auto fit = as.finite_faces_begin() ; fit != as.finite_faces_end() ; ++fit)
+    {
+        if(as.classify(fit) != Alpha_shape_2::INTERIOR)
+            continue;
+
+        const Alpha_shape_2::Face_handle face{fit};
+        if(checkFaceDeletion(face))
+            continue;
+
+        face->info().keep = true;
+        face->info().index = counter;
+        counter++;
+    }
+
+    if(counter == 0)
+        throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
+
+    m_elementsList.resize(counter);
+
+    // We check for each triangle whi ch one will be kept (alpha shape), then we
     // perfom operations on the remaining elements
     for(auto fit = as.finite_faces_begin() ; fit != as.finite_faces_end() ; ++fit)
     {
-        // If true, the elements are fluid elements
-        if(as.classify(fit) == Alpha_shape_2::INTERIOR)
+        const Alpha_shape_2::Face_handle face{fit};
+
+        if(!face->info().keep)
+            continue;
+
+        const std::size_t elementIndex = face->info().index;
+
+        assert(elementIndex < m_elementsList.size());
+
+        const std::size_t in0 = face->vertex(0)->info(), in1 = face->vertex(1)->info(), in2 = face->vertex(2)->info();
+
+        Element element(*this);
+        element.m_nodesIndexes = {in0, in1, in2};
+
+        std::set<std::size_t> neighborElements;
+        for(unsigned short i = 0 ; i < 3 ; ++i)
         {
-            const Alpha_shape_2::Face_handle face{fit};
-            std::size_t in0 = face->vertex(0)->info(), in1 = face->vertex(1)->info(), in2 = face->vertex(2)->info();
-
-            if(checkFaceDeletion(face))
-                continue;
-
-            Element element(*this);
-            element.m_nodesIndexes = {in0, in1, in2};
-
-            element.computeJ();
-            element.computeDetJ();
-            element.computeInvJ();
-
-            // Those nodes are not free (flying nodes and not wetted boundary nodes)
-            m_nodesList[in0].m_neighbourNodes.push_back(in1);
-            m_nodesList[in0].m_neighbourNodes.push_back(in2);
-
-            m_nodesList[in1].m_neighbourNodes.push_back(in0);
-            m_nodesList[in1].m_neighbourNodes.push_back(in2);
-
-            m_nodesList[in2].m_neighbourNodes.push_back(in0);
-            m_nodesList[in2].m_neighbourNodes.push_back(in1);
-
-            m_elementsList.push_back(std::move(element));
-
-            for(std::size_t index: m_elementsList.back().m_nodesIndexes)
-                m_nodesList[index].m_elements.push_back(m_elementsList.size() - 1);
+            Alpha_shape_2::Face_circulator faceCirc = as.incident_faces(face->vertex(i)), done = faceCirc;
+            do
+            {
+                if(faceCirc->info().keep && (faceCirc->info().index != elementIndex))
+                    neighborElements.insert(faceCirc->info().index);
+                faceCirc++;
+            } while(faceCirc != done);
         }
+
+        element.m_neighbourElements.resize(neighborElements.size());
+        std::copy(neighborElements.begin(), neighborElements.end(), element.m_neighbourElements.begin());
+
+        element.computeJ();
+        element.computeDetJ();
+        element.computeInvJ();
+
+        // Those nodes are not free (flying nodes and not wetted boundary nodes)
+        m_nodesList[in0].m_neighbourNodes.push_back(in1);
+        m_nodesList[in0].m_neighbourNodes.push_back(in2);
+
+        m_nodesList[in1].m_neighbourNodes.push_back(in0);
+        m_nodesList[in1].m_neighbourNodes.push_back(in2);
+
+        m_nodesList[in2].m_neighbourNodes.push_back(in0);
+        m_nodesList[in2].m_neighbourNodes.push_back(in1);
+
+        m_elementsList[elementIndex] = std::move(element);
+
+        for(std::size_t index: m_elementsList[elementIndex].m_nodesIndexes)
+            m_nodesList[index].m_elements.push_back(elementIndex);
     }
 
     #pragma omp parallel for default(shared)
@@ -150,7 +207,7 @@ void Mesh::triangulateAlphaShape2D()
                 face = edgeAS.first;
             }
 
-            if(checkFaceDeletion(face))
+            if(!face->info().keep)
                 continue;
 
             Facet facet(*this);
@@ -180,9 +237,6 @@ void Mesh::triangulateAlphaShape2D()
         deleteFlyingNodes(false);
 
     computeFSNormalCurvature();
-
-    if(m_elementsList.empty())
-        throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
 }
 
 void Mesh::computeFSNormalCurvature2D()

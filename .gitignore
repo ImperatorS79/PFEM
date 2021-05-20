@@ -8,3 +8,4 @@ nlohmann/
 *.msh
 *.cpp.save-failed
 *.hpp.save-failed
+*.inl.save-failed

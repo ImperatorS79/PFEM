@@ -3,24 +3,26 @@
 #include "../../Solver.hpp"
 #include "../../utility/StatesFromToQ.hpp"
 
-ContEqWCompNewton::ContEqWCompNewton(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
+template<unsigned short dim>
+ContEqWCompNewton<dim>::ContEqWCompNewton(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
                                      std::vector<SolTable> solverParams, std::vector<SolTable> materialParams,
                                      const std::vector<unsigned short>& bcFlags, const std::vector<unsigned int>& statesIndex) :
 Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, statesIndex, "ContEq")
 {
     unsigned int nGPHD = 0;
     unsigned int nGPLD = 0;
-    if(m_pMesh->getDim() == 2)
+    if constexpr (dim == 2)
     {
         nGPHD = 3;
         nGPLD = 3;
     }
-    else
+    else if constexpr (dim == 3)
     {
         nGPHD = 4;
         nGPLD = 3;
     }
-    m_pMatBuilder2 = std::make_unique<MatrixBuilder>(*pMesh, nGPHD, nGPLD);
+    m_pMatBuilder = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
+    m_pMatBuilder2 = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
 
     m_K0 = m_materialParams[0].checkAndGet<double>("K0");
     m_K0p = m_materialParams[0].checkAndGet<double>("K0p");
@@ -34,15 +36,13 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         m_Tr = m_materialParams[0].checkAndGet<double>("Tr");
     }
 
-    Eigen::VectorXd m;
-    if(m_pMesh->getDim() == 2)
+    mVecType<dim> m;
+    if constexpr (dim == 2)
     {
-        m.resize(3);
         m << 1, 1, 0;
     }
-    else
+    else if constexpr (dim == 3)
     {
-        m.resize(6);
         m << 1, 1, 1, 0, 0, 0;
     }
     m_pMatBuilder->setm(m);
@@ -59,26 +59,34 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
             throw std::runtime_error("the " + getID() + " equation requires 3 statesIndex: one index for the p unknown, one for the rho unknown, and one for the beginning of the (u,v,w) unknown!");
     }
 
-    m_pMatBuilder->setMcomputeFactor([&](const Element& /** element **/, const Eigen::MatrixXd& /** N **/) -> double {
+    m_pMatBuilder->setMcomputeFactor([&](const Element& /** element **/,
+                                         const NmatTypeHD<dim>& /** N **/) -> double {
         return 1;
     });
 
-    m_pMatBuilder->setDcomputeFactor([&](const Element& element, const Eigen::MatrixXd& N, const Eigen::MatrixXd& /** B **/) -> double {
-        return (N*getElementState(m_pMesh, element, m_statesIndex[1])).value();
+    m_pMatBuilder->setDcomputeFactor([&](const Element& element,
+                                         const NmatTypeHD<dim>& N,
+                                         const BmatType<dim>& /** B **/) -> double {
+        return (N*getElementState<dim>(element, m_statesIndex[1])).value();
     });
 
     if(m_pSolver->getID() == "CDS_FIC")
     {
-        m_pMatBuilder2->setMcomputeFactor([&](const Element& element, const Eigen::MatrixXd& N) -> double {
-            return (N*getElementState(m_pMesh, element, m_statesIndex[1])).value();
+        m_pMatBuilder2->setMcomputeFactor([&](const Element& element,
+                                              const NmatTypeHD<dim>& N) -> double {
+            return (N*getElementState<dim>(element, m_statesIndex[1])).value();
         });
 
-        m_pMatBuilder2->setLcomputeFactor([&](const Element& element, const Eigen::MatrixXd& N, const Eigen::MatrixXd& /** B **/) -> double {
-            return (N*getElementState(m_pMesh, element, m_statesIndex[1])).value();
+        m_pMatBuilder2->setLcomputeFactor([&](const Element& element,
+                                              const NmatTypeHD<dim>& N,
+                                              const BmatType<dim>& /** B **/) -> double {
+            return (N*getElementState<dim>(element, m_statesIndex[1])).value();
         });
 
-        m_pMatBuilder2->setHcomputeFactor([&](const Element& element, const Eigen::MatrixXd& N, const Eigen::MatrixXd& /** B **/) -> double {
-            double rho = (N*getElementState(m_pMesh, element, m_statesIndex[1])).value();
+        m_pMatBuilder2->setHcomputeFactor([&](const Element& element,
+                                              const NmatTypeHD<dim>& N,
+                                              const BmatType<dim>& /** B **/) -> double {
+            double rho = (N*getElementState<dim>(element, m_statesIndex[1])).value();
             return rho*rho;
         });
 
@@ -98,17 +106,19 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     auto bodyForce = m_equationParams[0].checkAndGet<std::vector<double>>("bodyForce");
     if(bodyForce.size() != m_pMesh->getDim())
         throw std::runtime_error("the body force vector has not the right dimension!");
-    m_bodyForce = Eigen::Map<Eigen::VectorXd>(bodyForce.data(), bodyForce.size());
+    m_bodyForce = Eigen::Map<Eigen::Matrix<double, dim, 1>>(bodyForce.data(), bodyForce.size());
 
     m_needNormalCurv = false;
 }
 
-ContEqWCompNewton::~ContEqWCompNewton()
+template<unsigned short dim>
+ContEqWCompNewton<dim>::~ContEqWCompNewton()
 {
 
 }
 
-void ContEqWCompNewton::displayParams() const
+template<unsigned short dim>
+void ContEqWCompNewton<dim>::displayParams() const
 {
     std::cout << "Continuity equation parameters:\n"
               << " * K0: " << m_K0 << " Pa\n"
@@ -117,30 +127,31 @@ void ContEqWCompNewton::displayParams() const
               << " * Strong continuity: " << std::boolalpha << m_strongContinuity << std::endl;
 }
 
-double ContEqWCompNewton::getSpeedEquiv(double /** he **/, const Node& node)
+template<unsigned short dim>
+double ContEqWCompNewton<dim>::getSquaredSpeedEquiv(const Node& node) const
 {
-    return (m_K0 + m_K0p*node.getState(m_pMesh->getDim()))/node.getState(m_pMesh->getDim() + 1);
+    return (m_K0 + m_K0p*node.getState(dim))/node.getState(dim + 1);
 }
 
-bool ContEqWCompNewton::solve()
+template<unsigned short dim>
+bool ContEqWCompNewton<dim>::solve()
 {
     if(m_pProblem->isOutputVerbose())
         std::cout << "Continuity Equation" << std::endl;
 
     m_clock.start();
-    Eigen::DiagonalMatrix<double,Eigen::Dynamic> invM; //The mass matrix of the continuity.
     Eigen::VectorXd qRho(m_pMesh->getNodesCount());
     m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
 
     if(m_pSolver->getID() == "CDS_FIC")
     {
-        m_buildSystemFIC(invM, m_F0);
+        m_buildSystemFIC();
         m_clock.start();
-        m_applyBC(invM, m_F0);
+        m_applyBC();
         m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
         std::size_t indexPrevRho = m_pMesh->getNode(0).getStates().size() - 1;
         m_clock.start();
-        qRho = invM*m_F0;
+        qRho = m_invM*m_F0;
         m_accumalatedTimes["Solve system"] += m_clock.end();
 
         m_clock.start();
@@ -151,12 +162,12 @@ bool ContEqWCompNewton::solve()
     }
     else
     {
-        m_buildSystem(invM, m_F0);
+        m_buildSystem();
         m_clock.start();
-        m_applyBC(invM, m_F0);
+        m_applyBC();
         m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
         m_clock.start();
-        qRho = invM*m_F0;
+        qRho = m_invM*m_F0;
         m_accumalatedTimes["Solve system"] += m_clock.end();
     }
 
@@ -170,35 +181,40 @@ bool ContEqWCompNewton::solve()
     return true;
 }
 
-void ContEqWCompNewton::preCompute()
+template<unsigned short dim>
+void ContEqWCompNewton<dim>::preCompute()
 {
     if(m_strongContinuity)
-        m_buildF0(m_F0);
+        m_buildF0();
 }
 
-void ContEqWCompNewton::m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F0)
+template<unsigned short dim>
+void ContEqWCompNewton<dim>::m_applyBC()
 {
-    auto& invMDiag = invM.diagonal();
+    auto& invMDiag = m_invM.diagonal();
 
     for (std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n)
     {
         const Node& node = m_pMesh->getNode(n);
 
-        if(node.isFree())
+        if(node.isFree() || node.isOnFreeSurface())
         {
-            F0(n) = m_rhoStar;
+            m_F0(n) = m_rhoStar;
 
             invMDiag[n] = 1;
         }
     }
 }
 
-void ContEqWCompNewton::m_buildF0(Eigen::VectorXd& F0)
+template<unsigned short dim>
+void ContEqWCompNewton<dim>::m_buildF0()
 {
     m_clock.start();
-    F0.resize(m_pMesh->getNodesCount()); F0.setZero();
+    constexpr unsigned short nodPerEl = dim + 1;
 
-    std::vector<Eigen::VectorXd> F0e(m_pMesh->getElementsCount());
+    m_F0.resize(m_pMesh->getNodesCount()); m_F0.setZero();
+
+    std::vector<Eigen::Matrix<double, nodPerEl, 1>> F0e(m_pMesh->getElementsCount());
     m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
 
     m_clock.start();
@@ -208,9 +224,9 @@ void ContEqWCompNewton::m_buildF0(Eigen::VectorXd& F0)
     {
         const Element& element = m_pMesh->getElement(elm);
 
-        Eigen::VectorXd Rho = getElementState(m_pMesh, element, m_statesIndex[1]);
+        Eigen::Matrix<double, nodPerEl, 1> Rho = getElementState<dim>(element, m_statesIndex[1]);
 
-        Eigen::MatrixXd Mrhoe = m_pMatBuilder->getM(element);
+        Eigen::Matrix<double, nodPerEl, nodPerEl> Mrhoe = m_pMatBuilder->getM(element);
 
         F0e[elm] = Mrhoe*Rho;
     }
@@ -223,25 +239,25 @@ void ContEqWCompNewton::m_buildF0(Eigen::VectorXd& F0)
         const Element& element = m_pMesh->getElement(elm);
 
         for(uint8_t i = 0 ; i < m_pMesh->getNodesPerElm() ; ++i)
-            F0(element.getNodeIndex(i)) += F0e[elm](i);
+            m_F0(element.getNodeIndex(i)) += F0e[elm](i);
     }
     m_accumalatedTimes["Assemble matrix"] += m_clock.end();
 }
 
-void ContEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F0)
+template<unsigned short dim>
+void ContEqWCompNewton<dim>::m_buildSystem()
 {
     m_clock.start();
-    const unsigned short dim = m_pMesh->getDim();
-    const unsigned short noPerEl = m_pMesh->getNodesPerElm();
+    constexpr unsigned short nodPerEl = dim + 1;
 
-    invM.resize(m_pMesh->getNodesCount()); invM.setZero();
+    m_invM.resize(m_pMesh->getNodesCount()); m_invM.setZero();
 
-    std::vector<Eigen::DiagonalMatrix<double, Eigen::Dynamic>> MeLumped(m_pMesh->getElementsCount());
-    std::vector<Eigen::VectorXd> F0e;
+    std::vector<Eigen::DiagonalMatrix<double, nodPerEl>> MeLumped(m_pMesh->getElementsCount());
+    std::vector<Eigen::Matrix<double, nodPerEl, 1>> F0e;
 
     if(!m_strongContinuity)
     {
-        F0.resize(m_pMesh->getNodesCount()); F0.setZero();
+        m_F0.resize(m_pMesh->getNodesCount()); m_F0.setZero();
         F0e.resize(m_pMesh->getElementsCount());
     }
     m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
@@ -253,28 +269,17 @@ void ContEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynami
     {
         const Element& element = m_pMesh->getElement(elm);
 
-        Eigen::MatrixXd Me = m_pMatBuilder->getM(element);
-        MeLumped[elm] = MatrixBuilder::lump2(Me);
+        Eigen::Matrix<double, nodPerEl, nodPerEl> Me = m_pMatBuilder->getM(element);
+        MeLumped[elm] = MatrixBuilder<dim>:: template lump2<nodPerEl>(Me);
 
         if(!m_strongContinuity)
         {
-            Eigen::VectorXd Rho = getElementState(m_pMesh, element, m_statesIndex[1]);
-            Eigen::VectorXd V(noPerEl*dim);
-            if(dim == 2)
-            {
-                V << getElementState(m_pMesh, element, m_statesIndex[2]),
-                     getElementState(m_pMesh, element, m_statesIndex[2] + 1);
-            }
-            else
-            {
-                 V << getElementState(m_pMesh, element, m_statesIndex[2]),
-                      getElementState(m_pMesh, element, m_statesIndex[2] + 1),
-                      getElementState(m_pMesh, element, m_statesIndex[2] + 2);
-            }
+            Eigen::Matrix<double, nodPerEl, 1> Rho = getElementState<dim>(element, m_statesIndex[1]);
+            Eigen::Matrix<double, dim*nodPerEl, 1> V = getElementVecState<dim>(element, m_statesIndex[2]);
 
-            Eigen::MatrixXd gradNe = m_pMatBuilder->getGradN(element);
-            Eigen::MatrixXd Be = m_pMatBuilder->getB(gradNe);
-            Eigen::MatrixXd Drhoe = m_pMatBuilder->getD(element, Be);
+            GradNmatType<dim> gradNe = m_pMatBuilder->getGradN(element);
+            BmatType<dim> Be = m_pMatBuilder->getB(gradNe);
+            Eigen::Matrix<double, nodPerEl, dim*nodPerEl> Drhoe = m_pMatBuilder->getD(element, Be);
 
             F0e[elm] = - m_pSolver->getTimeStep()*Drhoe*V;
 
@@ -288,38 +293,38 @@ void ContEqWCompNewton::m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynami
     m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
     m_clock.start();
-    auto& invMDiag = invM.diagonal();
+    auto& invMDiag = m_invM.diagonal();
 
     for(std::size_t elm = 0 ; elm < m_pMesh->getElementsCount() ; ++elm)
     {
         const Element& element = m_pMesh->getElement(elm);
 
-        for(unsigned short i = 0 ; i < noPerEl ; ++i)
+        for(unsigned short i = 0 ; i < nodPerEl ; ++i)
         {
             invMDiag[element.getNodeIndex(i)] += MeLumped[elm].diagonal()[i];
 
             if(!m_strongContinuity)
             {
-                F0(element.getNodeIndex(i)) += F0e[elm](i);
+                m_F0(element.getNodeIndex(i)) += F0e[elm](i);
             }
         }
     }
 
-    MatrixBuilder::inverse(invM);
+    MatrixBuilder<dim>::inverse(m_invM);
     m_accumalatedTimes["Assemble matrix"] += m_clock.end();
 }
 
-void ContEqWCompNewton::m_buildSystemFIC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F0)
+template<unsigned short dim>
+void ContEqWCompNewton<dim>::m_buildSystemFIC()
 {
     m_clock.start();
-    const unsigned short dim = m_pMesh->getDim();
-    const unsigned short noPerEl = m_pMesh->getNodesPerElm();
+    constexpr unsigned short nodPerEl = dim + 1;
 
-    invM.resize(m_pMesh->getNodesCount()); invM.setZero();
+    m_invM.resize(m_pMesh->getNodesCount()); m_invM.setZero();
 
-    std::vector<Eigen::DiagonalMatrix<double, Eigen::Dynamic>> MeLumped(m_pMesh->getElementsCount());
-    std::vector<Eigen::VectorXd> F0e;
-    F0.resize(m_pMesh->getNodesCount()); F0.setZero();
+    std::vector<Eigen::DiagonalMatrix<double, nodPerEl>> MeLumped(m_pMesh->getElementsCount());
+    std::vector<Eigen::Matrix<double, nodPerEl, 1>> F0e;
+    m_F0.resize(m_pMesh->getNodesCount()); m_F0.setZero();
     F0e.resize(m_pMesh->getElementsCount());
 
     std::size_t indexPrevRho = m_pMesh->getNode(0).getStates().size() - 1;
@@ -333,44 +338,27 @@ void ContEqWCompNewton::m_buildSystemFIC(Eigen::DiagonalMatrix<double,Eigen::Dyn
     {
         const Element& element = m_pMesh->getElement(elm);
 
-        Eigen::VectorXd Rho = getElementState(m_pMesh, element, m_statesIndex[1]);
-        Eigen::VectorXd prevRho = getElementState(m_pMesh, element, indexPrevRho);
-        Eigen::VectorXd P = getElementState(m_pMesh, element, m_statesIndex[0]);
-        Eigen::VectorXd V(noPerEl*dim);
-        Eigen::VectorXd A(noPerEl*dim);
-        if(dim == 2)
-        {
-            V << getElementState(m_pMesh, element, m_statesIndex[2]),
-                 getElementState(m_pMesh, element, m_statesIndex[2] + 1);
+        Eigen::Matrix<double, nodPerEl, 1> Rho = getElementState<dim>(element, m_statesIndex[1]);
+        Eigen::Matrix<double, nodPerEl, 1> prevRho = getElementState<dim>(element, indexPrevRho);
+        Eigen::Matrix<double, nodPerEl, 1> P = getElementState<dim>(element, m_statesIndex[0]);
+        Eigen::Matrix<double, dim*nodPerEl, 1> V = getElementVecState<dim>(element, m_statesIndex[2]);
+        //Eigen::Matrix<double, dim*nodPerEl, 1> A = getElementVecState<dim>(element, dim + 2);
 
-            A << getElementState(m_pMesh, element, dim + 2),
-                 getElementState(m_pMesh, element, dim + 3);
-        }
-        else
-        {
-             V << getElementState(m_pMesh, element, m_statesIndex[2]),
-                  getElementState(m_pMesh, element, m_statesIndex[2] + 1),
-                  getElementState(m_pMesh, element, m_statesIndex[2] + 2);
-
-            A << getElementState(m_pMesh, element, dim + 2),
-                  getElementState(m_pMesh, element, dim + 3),
-                  getElementState(m_pMesh, element, dim + 4);
-        }
-        Eigen::MatrixXd gradNe = m_pMatBuilder->getGradN(element);
-        Eigen::MatrixXd Be = m_pMatBuilder->getB(gradNe);
+        GradNmatType<dim> gradNe = m_pMatBuilder->getGradN(element);
+        BmatType<dim> Be = m_pMatBuilder->getB(gradNe);
 
         double tau = m_computeTauFIC(element);
-        Eigen::MatrixXd Me = m_pMatBuilder->getM(element);
-        MatrixBuilder::lump(Me);
-        Eigen::MatrixXd Drhoe = m_pMatBuilder->getD(element, Be);
+        Eigen::Matrix<double, nodPerEl, nodPerEl> Me = m_pMatBuilder->getM(element);
+        MatrixBuilder<dim>:: template lump<nodPerEl>(Me);
+        Eigen::Matrix<double, nodPerEl, dim*nodPerEl> Drhoe = m_pMatBuilder->getD(element, Be);
 
-        Eigen::MatrixXd Me_tau_rho = tau*m_pMatBuilder2->getM(element);
-        MatrixBuilder::lump(Me_tau_rho);
-        Eigen::MatrixXd Le_tau_rho = tau*m_pMatBuilder2->getL(element, Be, gradNe);
-        Eigen::MatrixXd He_tau_rho_2 = tau*m_pMatBuilder2->getH(element, m_bodyForce, Be, gradNe);
+        Eigen::Matrix<double, nodPerEl, nodPerEl> Me_tau_rho = tau*m_pMatBuilder2->getM(element);
+        MatrixBuilder<dim>:: template lump<nodPerEl>(Me_tau_rho);
+        Eigen::Matrix<double, nodPerEl, nodPerEl> Le_tau_rho = tau*m_pMatBuilder2->getL(element, Be, gradNe);
+        Eigen::Matrix<double, nodPerEl, 1> He_tau_rho_2 = tau*m_pMatBuilder2->getH(element, m_bodyForce, Be, gradNe);
 
         F0e[elm] = Me*Rho + dt*(-Drhoe*V - Le_tau_rho*P + He_tau_rho_2) + (1/dt)*Me_tau_rho*(2*Rho - prevRho);
-        MeLumped[elm] = MatrixBuilder::lump2(Me + (1/dt)*Me_tau_rho);
+        MeLumped[elm] = MatrixBuilder<dim>:: template lump2<nodPerEl>(Me + (1/dt)*Me_tau_rho);
 
 //        Eigen::MatrixXd gradNe = m_pMatBuilder->getGradN(element);
 //        Eigen::MatrixXd Be = m_pMatBuilder->getB(gradNe);
@@ -391,51 +379,40 @@ void ContEqWCompNewton::m_buildSystemFIC(Eigen::DiagonalMatrix<double,Eigen::Dyn
     m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
     m_clock.start();
-    auto& invMDiag = invM.diagonal();
+    auto& invMDiag = m_invM.diagonal();
 
     for(std::size_t elm = 0 ; elm < m_pMesh->getElementsCount() ; ++elm)
     {
         const Element& element = m_pMesh->getElement(elm);
 
-        for(unsigned short i = 0 ; i < noPerEl ; ++i)
+        for(unsigned short i = 0 ; i < nodPerEl ; ++i)
         {
             invMDiag[element.getNodeIndex(i)] += MeLumped[elm].diagonal()[i];
-            F0(element.getNodeIndex(i)) += F0e[elm](i);
+            m_F0(element.getNodeIndex(i)) += F0e[elm](i);
         }
     }
 
-    MatrixBuilder::inverse(invM);
+    MatrixBuilder<dim>::inverse(m_invM);
     m_accumalatedTimes["Assemble matrix"] += m_clock.end();
 }
 
-Eigen::VectorXd ContEqWCompNewton::m_getPFromRhoTaitMurnagham(const Eigen::VectorXd& qRho)
+template<unsigned short dim>
+Eigen::VectorXd ContEqWCompNewton<dim>::m_getPFromRhoTaitMurnagham(const Eigen::VectorXd& qRho)
 {
     Eigen::VectorXd qP(m_pMesh->getNodesCount());
 
-    if(m_pProblem->getID() == "BoussinesqWC")
+    #pragma omp parallel for default(shared)
+    for(std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n)
     {
-        #pragma omp parallel for default(shared)
-        for(std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n)
-        {
-            double rho = qRho[n];
-            double T = m_pMesh->getNode(n).getState(m_statesIndex[3]);
-            qP[n] = (m_K0/m_K0p)*(std::pow(rho/(m_rhoStar*(1 - m_alpha*(T - m_Tr))), m_K0p) - 1);
-        }
-    }
-    else
-    {
-        #pragma omp parallel for default(shared)
-        for(std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n)
-        {
-            double rho = qRho[n];
-            qP[n] = (m_K0/m_K0p)*(std::pow(rho/m_rhoStar, m_K0p) - 1);
-        }
+        double rho = qRho[n];
+        qP[n] = (m_K0/m_K0p)*(std::pow(rho/m_rhoStar, m_K0p) - 1);
     }
 
     return qP;
 }
 
-double ContEqWCompNewton::m_computeTauFIC(const Element& element) const
+template<unsigned short dim>
+double ContEqWCompNewton<dim>::m_computeTauFIC(const Element& element) const
 {
     const double h = std::sqrt(m_pMesh->getRefElementSize(m_pMesh->getDim())*element.getDetJ()/M_PI);
 

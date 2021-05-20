@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-0.05, -0.05, 0.634, 100},
+		exclusionZones = {},
 		mshFile = "examples/2D/dropFallInFluid/geometry.msh"
 	},
 	

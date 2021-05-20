@@ -14,6 +14,7 @@ m_alpha(meshInfos.alpha),
 m_omega(meshInfos.omega),
 m_gamma(meshInfos.gamma),
 m_boundingBox(meshInfos.boundingBox),
+m_exclusionZones(meshInfos.exclusionZones),
 m_addOnFS(meshInfos.addOnFS),
 m_deleteFlyingNodes(meshInfos.deleteFlyingNodes),
 m_computeNormalCurvature(true)
@@ -147,11 +148,7 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
 {
     assert(!m_elementsList.empty() && !m_nodesList.empty() && "There is no mesh !");
 
-    std::vector<bool> toBeDeletedElement(m_elementsList.size(), false);   //Should the element be deleted
     std::vector<bool> toBeDeletedNodes(m_nodesList.size(), false);   //Should the node be deleted
-
-    std::vector<std::size_t> nodesIndexesDeleted = {};
-    std::vector<std::size_t> elementIndexesDeleted = {};
 
     bool outofBBNodes = false;
 
@@ -175,55 +172,9 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
         if(isNodeOutOfBB(m_nodesList[n]))
         {
             toBeDeletedNodes[n] = true;
-
-            if(!m_nodesList[n].isFree())
-            {
-                //There are elements to delete
-                for(std::size_t i = 0 ; i < m_nodesList[n].m_elements.size() ; ++i)
-                {
-                    toBeDeletedElement[m_nodesList[n].m_elements[i]] = true;
-                }
-            }
+            outofBBNodes = true;
         }
     }
-
-    for(std::size_t n = 0 ; n < toBeDeletedNodes.size() ; ++n)
-        if(toBeDeletedNodes[n]) nodesIndexesDeleted.push_back(n);
-
-    for(std::size_t elm = 0 ; elm < toBeDeletedElement.size() ; ++elm)
-        if(toBeDeletedElement[elm]) elementIndexesDeleted.push_back(elm);
-
-    m_elementsList.erase(
-    std::remove_if(m_elementsList.begin(), m_elementsList.end(), [this, &toBeDeletedElement, verboseOutput](const Element& element){
-        if(toBeDeletedElement[&element - &*std::begin(m_elementsList)])
-        {
-            if(verboseOutput)
-            {
-                std::cout << "Removing out of bounding box element: [";
-                for(unsigned short n= 0 ; n < m_dim + 1 ; ++n)
-                {
-                    std::cout << "(";
-                    for(unsigned short d = 0 ; d < m_dim ; ++d)
-                    {
-                        std::cout << this->m_nodesList[element.m_nodesIndexes[n]].m_position[d];
-                        if(d == m_dim - 1)
-                            std::cout << ")";
-                        else
-                            std::cout << ", ";
-                    }
-                    if(n == m_dim)
-                            std::cout << "]";
-                    else
-                        std::cout << ", ";
-                }
-                std::cout << std::endl;
-            }
-
-            return true;
-        }
-        else
-            return false;
-    }), m_elementsList.end());
 
     m_nodesList.erase(
     std::remove_if(m_nodesList.begin(), m_nodesList.end(), [this, &toBeDeletedNodes, verboseOutput](const Node& node)
@@ -249,45 +200,6 @@ bool Mesh::checkBoundingBox(bool verboseOutput) noexcept
         else
            return false;
     }), m_nodesList.end());
-
-    for(std::size_t i = 0 ; i < nodesIndexesDeleted.size() ; ++i)
-    {
-        for(Element& element : m_elementsList)
-        {
-            for(std::size_t& n : element.m_nodesIndexes)
-            {
-                if(n > nodesIndexesDeleted[i])
-                    n--;
-            }
-        }
-
-        for(Node& node : m_nodesList)
-        {
-            for(std::size_t& n : node.m_neighbourNodes)
-            {
-                if(n > nodesIndexesDeleted[i])
-                    n--;
-            }
-        }
-
-        for(std::size_t j = i + 1 ; j < nodesIndexesDeleted.size() ; ++j)
-            nodesIndexesDeleted[j]--;
-    }
-
-    for(std::size_t i = 0 ; i < elementIndexesDeleted.size() ; ++i)
-    {
-        for(Node& node : m_nodesList)
-        {
-            for(std::size_t& elm : node.m_elements)
-            {
-                if(elm > elementIndexesDeleted[i])
-                    elm--;
-            }
-        }
-
-        for(std::size_t j = i + 1 ; j < elementIndexesDeleted.size() ; ++j)
-            elementIndexesDeleted[j]--;
-    }
 
     return outofBBNodes;
 }
@@ -322,9 +234,6 @@ void Mesh::computeMeshDim()
 
 void Mesh::computeFSNormalCurvature()
 {
-    m_freeSurfaceCurvature.clear();
-    m_boundFSNormal.clear();
-
     switch(m_dim)
     {
         case 2:
@@ -666,6 +575,185 @@ std::vector<std::vector<double>> Mesh::getGradShapeFunctions(unsigned int dimens
     return gradsfs;
 }
 
+void Mesh::laplacianSmoothingBoundaries()
+{
+    for(std::size_t elm = 0 ; elm < m_elementsList.size() ; ++elm)
+    {
+        const Element& element = m_elementsList[elm];
+
+        if(!element.isContact())
+            continue;
+
+        Node* pOutNode = nullptr;
+        std::array<Node*, 3> pFacetNodes = {nullptr, nullptr, nullptr};
+
+        unsigned short counter = 0;
+        for(std::size_t i = 0 ; i < getNodesPerElm() ; ++i)
+        {
+            Node& node = m_nodesList[element.getNodeIndex(i)];
+            if(!node.isBound())
+                pOutNode = &node;
+            else
+            {
+               pFacetNodes[counter] = &node;
+               counter++;
+            }
+        }
+
+        if(counter != m_dim)
+            continue;
+
+        double distFromFacet = 0;
+        std::array<double, 3> normalF = {0, 0, 0};
+        if(m_dim == 2)
+        {
+            if(pFacetNodes[0]->m_position[0] == pFacetNodes[1]->m_position[0])
+            {
+                normalF[0] = 1;
+
+                distFromFacet = std::fabs(pFacetNodes[0]->m_position[0] - pOutNode->m_position[0]);
+            }
+            else if(pFacetNodes[0]->m_position[1] == pFacetNodes[1]->m_position[1])
+            {
+                normalF[1] = 1;
+
+                distFromFacet = std::fabs(pFacetNodes[0]->m_position[1] - pOutNode->m_position[1]);
+            }
+            else
+            {
+                Eigen::Matrix<double, 2, 2> A;
+                A << pFacetNodes[0]->m_position[0], pFacetNodes[0]->m_position[1],
+                     pFacetNodes[1]->m_position[0], pFacetNodes[1]->m_position[1];
+
+                Eigen::Matrix<double, 2, 1> b;
+                b << -1,
+                     -1;
+
+                Eigen::Matrix<double, 2, 1> coeff = A.colPivHouseholderQr().solve(b);
+
+                for(unsigned short i = 0 ; i < 2 ; ++i)
+                    normalF[i] = coeff[i];
+
+                distFromFacet = std::fabs(normalF[0]*pOutNode->m_position[0] + normalF[1]*pOutNode->m_position[1] + 1)
+                          / std::sqrt(normalF[0]*normalF[0] + normalF[1]*normalF[1]);
+            }
+
+
+        }
+        else
+        {
+            if(pFacetNodes[0]->m_position[0] == pFacetNodes[1]->m_position[0] && pFacetNodes[1]->m_position[0] == pFacetNodes[2]->m_position[0])
+            {
+                normalF[0] = 1;
+
+                distFromFacet = std::fabs(pFacetNodes[0]->m_position[0] - pOutNode->m_position[0]);
+            }
+            else if(pFacetNodes[0]->m_position[1] == pFacetNodes[1]->m_position[1] && pFacetNodes[1]->m_position[1] == pFacetNodes[2]->m_position[1])
+            {
+                normalF[1] = 1;
+
+                distFromFacet = std::fabs(pFacetNodes[0]->m_position[1] - pOutNode->m_position[1]);
+            }
+            else if(pFacetNodes[0]->m_position[2] == pFacetNodes[1]->m_position[2] && pFacetNodes[1]->m_position[1] == pFacetNodes[2]->m_position[2])
+            {
+                normalF[2] = 1;
+
+                distFromFacet = std::fabs(pFacetNodes[0]->m_position[2] - pOutNode->m_position[2]);
+            }
+            else
+            {
+                Eigen::Matrix<double, 3, 3> A;
+                A << pFacetNodes[0]->m_position[0], pFacetNodes[0]->m_position[1], pFacetNodes[0]->m_position[2],
+                     pFacetNodes[1]->m_position[0], pFacetNodes[1]->m_position[1], pFacetNodes[1]->m_position[2],
+                     pFacetNodes[2]->m_position[0], pFacetNodes[2]->m_position[1], pFacetNodes[2]->m_position[2];
+
+                Eigen::Matrix<double, 3, 1> b;
+                b << -1,
+                     -1,
+                     -1;
+
+                Eigen::Matrix<double, 3, 1> coeff = A.colPivHouseholderQr().solve(b);
+
+                for(unsigned short i = 0 ; i < 3 ; ++i)
+                    normalF[i] = coeff[i];
+
+                distFromFacet = std::fabs(normalF[0]*pOutNode->m_position[0] + normalF[1]*pOutNode->m_position[1] + normalF[2]*pOutNode->m_position[2] + 1)
+                              / std::sqrt(normalF[0]*normalF[0] + normalF[1]*normalF[1] + normalF[2]*normalF[2]);
+            }
+        }
+
+        if(distFromFacet > m_hchar/3)
+            continue;
+
+        if(pOutNode->isOnFreeSurface())
+        {
+            if(m_dim == 2)
+            {
+                std::array<double, 3> vecToOutNode = {
+                    pOutNode->m_position[0] - pFacetNodes[0]->m_position[0],
+                    pOutNode->m_position[1] - pFacetNodes[0]->m_position[1],
+                    0
+                };
+
+                if(normalF[0]*vecToOutNode[0] + normalF[1]*vecToOutNode[1] < 0)
+                {
+                    normalF[0] *= -1;
+                    normalF[1] *= -1;
+                }
+
+                double norm = std::sqrt(normalF[0]*normalF[0] + normalF[1]*normalF[1]);
+                normalF[0] /= norm;
+                normalF[1] /= norm;
+
+                pOutNode->m_position[0] += m_hchar/3 * normalF[0];
+                pOutNode->m_position[1] += m_hchar/3 * normalF[1];
+            }
+            else
+            {
+                double norm = std::sqrt(normalF[0]*normalF[0] + normalF[1]*normalF[1] + normalF[2]*normalF[2]);
+
+                normalF[0] /= norm;
+                normalF[1] /= norm;
+                normalF[2] /= norm;
+
+                std::array<double, 3> vecToOutNode = {
+                    pOutNode->getCoordinate(0) - pFacetNodes[0]->getCoordinate(0),
+                    pOutNode->getCoordinate(1) - pFacetNodes[0]->getCoordinate(1),
+                    pOutNode->getCoordinate(2) - pFacetNodes[0]->getCoordinate(2)
+                };
+
+                if(vecToOutNode[0]*normalF[0] + vecToOutNode[1]*normalF[1] + vecToOutNode[2]*normalF[2] < 0)
+                {
+                    normalF[0] *= -1.0;
+                    normalF[1] *= -1.0;
+                    normalF[2] *= -1.0;
+                }
+
+                pOutNode->m_position[0] += m_hchar/3 * normalF[0];
+                pOutNode->m_position[1] += m_hchar/3 * normalF[1];
+                pOutNode->m_position[2] += m_hchar/3 * normalF[2];
+            }
+        }
+        else
+        {
+            std::array<double, 3> newPos = {0, 0, 0};
+            for(std::size_t i = 0 ; i < pOutNode->m_neighbourNodes.size() ; ++i)
+            {
+                const Node& node = m_nodesList[pOutNode->m_neighbourNodes[i]];
+                newPos[0] += node.getCoordinate(0);
+                newPos[1] += node.getCoordinate(1);
+                newPos[2] += node.getCoordinate(2);
+            }
+
+            newPos[0] /= static_cast<double>(pOutNode->m_neighbourNodes.size());
+            newPos[1] /= static_cast<double>(pOutNode->m_neighbourNodes.size());
+            newPos[2] /= static_cast<double>(pOutNode->m_neighbourNodes.size());
+
+            pOutNode->m_position = newPos;
+        }
+    }
+}
+
 void Mesh::loadFromFile(const std::string& fileName)
 {
     m_nodesList.clear();
@@ -689,7 +777,13 @@ void Mesh::loadFromFile(const std::string& fileName)
     computeMeshDim();
 
     if(m_boundingBox.size() != 2*m_dim)
-        throw std::runtime_error("bad bounding box format! Format: [xmin, ymin, xmax, ymax]");
+        throw std::runtime_error("Invalid bounding box size: " + std::to_string(m_boundingBox.size()));
+
+    for(auto& exclusionZone : m_exclusionZones)
+    {
+        if(exclusionZone.size() != 2*m_dim)
+            throw std::runtime_error("Invalid exclusion zone size: " + std::to_string(exclusionZone.size()));
+    }
 
     // We retrieve the tags of the physical groups of dimension m_dim and
     // m_dim-1
@@ -820,9 +914,10 @@ void Mesh::loadFromFile(const std::string& fileName)
 
 void Mesh::remesh(bool verboseOutput)
 {
-    checkBoundingBox(verboseOutput);
+    //laplacianSmoothingBoundaries();
     addNodes(verboseOutput);
     removeNodes(verboseOutput);
+    checkBoundingBox(verboseOutput);
     triangulateAlphaShape();
 }
 

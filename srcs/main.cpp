@@ -47,7 +47,7 @@ int main(int argc, char **argv)
 
         std::string problemType = table.checkAndGet<std::string>("id");
 
-        if(problemType == "IncompNewtonNoT" || problemType == "Boussinesq" || problemType == "Conduction")
+        if(problemType == "IncompNewtonNoT" || problemType == "Bingham" || problemType == "Boussinesq" || problemType == "Conduction")
             pProblem = std::make_unique<ProbIncompNewton>(argv[1]);
         else if(problemType == "WCompNewtonNoT" || problemType == "BoussinesqWC")
             pProblem = std::make_unique<ProbWCompNewton>(argv[1]);

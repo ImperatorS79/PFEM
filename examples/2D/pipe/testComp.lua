@@ -1,6 +1,6 @@
 Problem = {
     id = "WCompNewtonNoT",
-	simulationTime = 4,
+	simulationTime = 1,
 	verboseOutput = false,
 	
 	Mesh = {
@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-0.1, -0.1, 5, 1.1},
+		exclusionZones = {},
 		mshFile = "examples/2D/pipe/geometry.msh"
 	},
 	

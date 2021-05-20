@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-1, -1, -0.5, 5, 1, 1.5},
+		exclusionZones = {},
 		mshFile = "examples/3D/pipe/geometry.msh"
 	},
 	

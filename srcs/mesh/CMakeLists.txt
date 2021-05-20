@@ -20,7 +20,8 @@ add_library(pfemMesh SHARED ${LIBMESH_SRCS})
 target_include_directories(pfemMesh SYSTEM
                            PRIVATE ${EIGEN_INCLUDE_DIRS}
                            PRIVATE ${GMSH_INCLUDE_DIRS})
-target_link_libraries(pfemMesh PRIVATE OpenMP::OpenMP_CXX CGAL::CGAL ${GMSH_LIBRARIES})
+target_link_libraries(pfemMesh PRIVATE OpenMP::OpenMP_CXX  CGAL::CGAL ${GMSH_LIBRARIES})#
+
 if(CMAKE_CXX_COMPILER_ID MATCHES GNU)
     target_compile_options(pfemMesh PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES CLANG)

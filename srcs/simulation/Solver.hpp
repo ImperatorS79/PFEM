@@ -61,6 +61,12 @@ class SIMULATION_API Solver
 
         std::vector<SolTable> m_solverParams;   /**<  sol::table wrapper for the solver parameters (1 per thread). */
         double m_timeStep;                      /**< The current time step used. */
+        double m_remeshTimeStep;
+
+        bool m_adaptDT;
+        double m_maxDT;
+		double m_initialDT;
+		double m_maxRemeshDT;
 
         std::vector<std::unique_ptr<Equation>> m_pEquations;    /**< Smart pointers to the equations */
         bool m_solveSucceed;    /**< Did the solveOneTimeStep function succeeded ? */
@@ -72,8 +78,7 @@ class SIMULATION_API Solver
         Clock m_clock;
 
         double m_nextTimeToRemesh;
-        void m_computeNextRemeshTime(bool force);
-        void m_conditionalRemesh(std::size_t speedIndex);
+        void m_conditionalRemesh();
 };
 
 #include "Solver.inl"

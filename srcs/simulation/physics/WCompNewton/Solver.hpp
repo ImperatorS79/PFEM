@@ -21,10 +21,7 @@ class SIMULATION_API SolverWCompNewton: public Solver
         std::size_t getAdditionalStateCount() const override;
 
     protected:
-        bool m_adaptDT;
 		double m_securityCoeff;
-		double m_maxDT;
-		double m_initialDT;
 
 		std::function<bool()> m_solveFunc;
 		bool m_solveWCompNewtonNoT();

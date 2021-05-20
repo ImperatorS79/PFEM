@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-0.05, -0.05, -0.05, 4.05, 4.05, 100},
+		exclusionZones = {},
 		mshFile = "examples/3D/rayleigh/geometry.msh"
 	},
 	

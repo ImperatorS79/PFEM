@@ -3,19 +3,19 @@
 #include "../../Solver.hpp"
 #include "../../utility/StatesFromToQ.hpp"
 
-void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
+template<unsigned short dim>
+void MomContEqIncompNewton<dim>::m_buildAbPSPG(const Eigen::VectorXd& qPrev)
 {
     m_clock.start();
-    unsigned int dim = m_pMesh->getDim();
-    unsigned int noPerEl = m_pMesh->getNodesPerElm();
-    unsigned int tripletPerElm = (dim + 1)*noPerEl*(dim + 1)*noPerEl;
-    unsigned int doubletPerElm = (dim + 1)*noPerEl;
-    std::size_t nElm = m_pMesh->getElementsCount();
-    std::size_t nNodes = m_pMesh->getNodesCount();
-    double dt = m_pSolver->getTimeStep();
+    constexpr unsigned short nodPerEl = dim + 1;
+    const unsigned int tripletPerElm = (dim + 1)*nodPerEl*(dim + 1)*nodPerEl;
+    const unsigned int doubletPerElm = (dim + 1)*nodPerEl;
+    const std::size_t nElm = m_pMesh->getElementsCount();
+    const std::size_t nNodes = m_pMesh->getNodesCount();
+    const double dt = m_pSolver->getTimeStep();
 
     std::vector<Eigen::Triplet<double>> indexA(tripletPerElm*nElm);
-    std::vector<std::pair<std::size_t, double>> indexb(doubletPerElm*nElm); b.setZero();
+    std::vector<std::pair<std::size_t, double>> indexb(doubletPerElm*nElm); m_b.setZero();
     m_accumalatedTimes["Prepare matrix assembly"] += m_clock.end();
 
     m_clock.start();
@@ -24,42 +24,35 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
     for(std::size_t elm = 0 ; elm < nElm ; ++elm)
     {
         const Element& element = m_pMesh->getElement(elm);
-        Eigen::MatrixXd Ae((dim + 1)*noPerEl, (dim + 1)*noPerEl);
-        Eigen::VectorXd be((dim + 1)*noPerEl);
+        Eigen::Matrix<double, (dim + 1)*nodPerEl, (dim + 1)*nodPerEl> Ae;
+        Eigen::Matrix<double, (dim + 1)*nodPerEl, 1> be;
 
         double tau = m_computeTauPSPG(element);
-        Eigen::MatrixXd gradNe = m_pMatBuilder->getGradN(element);
-        Eigen::MatrixXd Be = m_pMatBuilder->getB(gradNe);
-        Eigen::MatrixXd Me_dt = (1/dt)*m_pMatBuilder->getM(element);
-        Me_dt = MatrixBuilder::diagBlock(Me_dt, dim);
-        Eigen::MatrixXd Ke = m_pMatBuilder->getK(element, Be);
-        Eigen::MatrixXd De = m_pMatBuilder->getD(element, Be);
-        Eigen::MatrixXd Ce_dt = (tau/dt)*m_pMatBuilder->getC(element, Be, gradNe);
-        Eigen::MatrixXd Le = tau*m_pMatBuilder->getL(element, Be, gradNe);
-        Eigen::VectorXd Fe = m_pMatBuilder->getF(element, m_bodyForce, Be);
-        Eigen::VectorXd He = tau*m_pMatBuilder->getH(element, m_bodyForce, Be, gradNe);
+        GradNmatType<dim> gradNe = m_pMatBuilder->getGradN(element);
+        BmatType<dim> Be = m_pMatBuilder->getB(gradNe);
+        auto Me_dt_s = static_cast<Eigen::Matrix<double, nodPerEl, nodPerEl>>((1/dt)*m_pMatBuilder->getM(element));
+        auto Me_dt = MatrixBuilder<dim>::diagBlock(Me_dt_s);
+        auto Ke = m_pMatBuilder->getK(element, Be);
+        auto De = m_pMatBuilder->getD(element, Be);
+        auto Ce_dt = (tau/dt)*m_pMatBuilder->getC(element, Be, gradNe);
+        auto Le = tau*m_pMatBuilder->getL(element, Be, gradNe);
+        auto Fe = m_pMatBuilder->getF(element, m_bodyForce, Be);
+        auto He = tau*m_pMatBuilder->getH(element, m_bodyForce, Be, gradNe);
 
         Ae << Me_dt + Ke, -De.transpose(), Ce_dt + De, Le;
 
-        Eigen::VectorXd vPrev(noPerEl*dim);
-        if(dim == 2)
-            vPrev << qPrev[element.getNodeIndex(0)], qPrev[element.getNodeIndex(1)], qPrev[element.getNodeIndex(2)],
-                     qPrev[element.getNodeIndex(0) + nNodes], qPrev[element.getNodeIndex(1) + nNodes], qPrev[element.getNodeIndex(2) + nNodes];
-        else
-            vPrev << qPrev[element.getNodeIndex(0)], qPrev[element.getNodeIndex(1)], qPrev[element.getNodeIndex(2)], qPrev[element.getNodeIndex(3)],
-                     qPrev[element.getNodeIndex(0) + nNodes], qPrev[element.getNodeIndex(1) + nNodes], qPrev[element.getNodeIndex(2) + nNodes], qPrev[element.getNodeIndex(3) + nNodes],
-                     qPrev[element.getNodeIndex(0) + 2*nNodes], qPrev[element.getNodeIndex(1) + 2*nNodes], qPrev[element.getNodeIndex(2) + 2*nNodes], qPrev[element.getNodeIndex(3) + 2*nNodes];
+        auto vPrev = getElementVecState<dim>(qPrev, element, 0, nNodes);
 
         be << Fe + Me_dt*vPrev, He + Ce_dt*vPrev;
 
         std::size_t countA = 0;
         std::size_t countb = 0;
 
-        for(unsigned short i = 0 ; i < noPerEl ; ++i)
+        for(unsigned short i = 0 ; i < nodPerEl ; ++i)
         {
             const Node& ni = m_pMesh->getNode(element.getNodeIndex(i));
 
-            for(unsigned short j = 0 ; j < noPerEl ; ++j)
+            for(unsigned short j = 0 ; j < nodPerEl ; ++j)
             {
                 for(unsigned short d1 = 0 ; d1 < dim ; ++d1)
                 {
@@ -70,7 +63,7 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
                             indexA[tripletPerElm*elm + countA] =
                                 Eigen::Triplet<double>(element.getNodeIndex(i) + d1*nNodes,
                                                        element.getNodeIndex(j) + d2*nNodes,
-                                                       Ae(i + d1*noPerEl, j + d2*noPerEl));
+                                                       Ae(i + d1*nodPerEl, j + d2*nodPerEl));
                         }
                         countA++;
                     }
@@ -83,7 +76,7 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
                         indexA[tripletPerElm*elm + countA] =
                             Eigen::Triplet<double>(element.getNodeIndex(i) + dim*nNodes,
                                                    element.getNodeIndex(j) + d2*nNodes,
-                                                   Ae(i + dim*noPerEl, j + d2*noPerEl));
+                                                   Ae(i + dim*nodPerEl, j + d2*nodPerEl));
                     }
 
                     countA++;
@@ -92,7 +85,7 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
 
             for(unsigned short d = 0 ; d <= dim ; ++d)
             {
-                indexb[doubletPerElm*elm + countb] = std::make_pair(element.getNodeIndex(i) + d*nNodes, be(i + d*noPerEl));
+                indexb[doubletPerElm*elm + countb] = std::make_pair(element.getNodeIndex(i) + d*nNodes, be(i + d*nodPerEl));
                 countb++;
             }
         }
@@ -131,25 +124,24 @@ void MomContEqIncompNewton::m_buildAbPSPG(Eigen::SparseMatrix<double>& A, Eigen:
                                         Compute A and b
     ********************************************************************************/
     m_clock.start();
-    A.setFromTriplets(indexA.begin(), indexA.end());
+    m_A.setFromTriplets(indexA.begin(), indexA.end());
     m_accumalatedTimes["Assemble matrix"] += m_clock.end();
 
     m_clock.start();
     for(const auto& doublet : indexb)
     {
         //std::cout << doublet.first << ", " << doublet.second << std::endl;
-        b[doublet.first] += doublet.second;
+        m_b[doublet.first] += doublet.second;
     }
     m_accumalatedTimes["Assemble vector"] += m_clock.end();
 }
 
-void MomContEqIncompNewton::m_applyBCPSPG(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev)
+template<unsigned short dim>
+void MomContEqIncompNewton<dim>::m_applyBCPSPG(const Eigen::VectorXd& qPrev)
 {
-    const uint8_t dim = m_pMesh->getDim();
     const std::size_t nodesCount = m_pMesh->getNodesCount();
-
     const std::size_t facetsCount = m_pMesh->getFacetsCount();
-    const std::size_t noPerFacet = m_pMesh->getNodesPerFacet();
+    constexpr unsigned short noPerFacet = dim;
 
     for(std::size_t f = 0 ; f < facetsCount ; ++f)
     {
@@ -170,10 +162,10 @@ void MomContEqIncompNewton::m_applyBCPSPG(Eigen::SparseMatrix<double>& A, Eigen:
         if(!onFS)
             continue;
 
-        Eigen::MatrixXd MGamma = m_pMatBuilder->getMGamma(facet);
-        MGamma = MatrixBuilder::diagBlock(MGamma, m_pMesh->getDim());
+        auto MGamma_s = m_pMatBuilder->getMGamma(facet);
+        auto MGamma = MatrixBuilder<dim>::diagBlock(MGamma_s);
 
-        Eigen::VectorXd kappa_n(dim*noPerFacet);
+        Eigen::Matrix<double, dim*noPerFacet, 1> kappa_n;
         for(uint8_t n = 0 ; n < noPerFacet; ++n)
         {
             double curvature = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(n));
@@ -183,12 +175,12 @@ void MomContEqIncompNewton::m_applyBCPSPG(Eigen::SparseMatrix<double>& A, Eigen:
                 kappa_n(n + d*noPerFacet) = curvature*normal[d];
         }
 
-        Eigen::VectorXd Ff = MGamma*kappa_n;
+        Eigen::Matrix<double, dim*noPerFacet, 1> Ff = MGamma*kappa_n;
 
         for(unsigned short i = 0 ; i < noPerFacet ; ++i)
         {
             for(unsigned short d = 0 ; d < dim ; ++d)
-                b(facet.getNodeIndex(i) + d*nodesCount) += Ff[d*noPerFacet + i];
+                m_b(facet.getNodeIndex(i) + d*nodesCount) += Ff[d*noPerFacet + i];
         }
     }
 
@@ -198,13 +190,13 @@ void MomContEqIncompNewton::m_applyBCPSPG(Eigen::SparseMatrix<double>& A, Eigen:
         const Node& node = m_pMesh->getNode(n);
         if(node.isFree())
         {
-            b(n + dim*nodesCount) = 0;
+            m_b(n + dim*nodesCount) = 0;
 
             if(!node.isBound())
             {
                 for(uint8_t d = 0 ; d < dim  ; ++d)
                 {
-                    b(n + d*nodesCount) = qPrev(n + d*nodesCount) + m_pSolver->getTimeStep()*m_bodyForce[d];
+                    m_b(n + d*nodesCount) = qPrev(n + d*nodesCount) + m_pSolver->getTimeStep()*m_bodyForce[d];
                 }
             }
         }
@@ -213,8 +205,8 @@ void MomContEqIncompNewton::m_applyBCPSPG(Eigen::SparseMatrix<double>& A, Eigen:
         {
             if(node.getFlag(m_bcFlags[0]))
             {
-                std::vector<double> result;
-                result = m_bcParams[0].call<std::vector<double>>(m_pMesh->getNodeType(n) + "V",
+                std::array<double, dim> result;
+                result = m_bcParams[0].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",
                                                         node.getPosition(),
                                                         m_pMesh->getBoundNodeInitPos(n),
                                                         m_pProblem->getCurrentSimTime() +
@@ -222,15 +214,15 @@ void MomContEqIncompNewton::m_applyBCPSPG(Eigen::SparseMatrix<double>& A, Eigen:
 
                 for(uint8_t d = 0 ; d < dim ; ++d)
                 {
-                    b(n + d*nodesCount) = result[d];
-                    for(Eigen::SparseMatrix<double>::InnerIterator it(A, n + d*nodesCount); it; ++it)
+                    m_b(n + d*nodesCount) = result[d];
+                    for(Eigen::SparseMatrix<double>::InnerIterator it(m_A, n + d*nodesCount); it; ++it)
                     {
                         Eigen::Index row = it.row();
                         if(row == it.col())
                             continue;
 
                         double value = it.value();
-                        b(row) -= value*result[d];
+                        m_b(row) -= value*result[d];
                         it.valueRef() = 0;
                     }
                 }
@@ -238,20 +230,22 @@ void MomContEqIncompNewton::m_applyBCPSPG(Eigen::SparseMatrix<double>& A, Eigen:
         }
     }
 
-    A.makeCompressed();
+    m_A.makeCompressed();
 }
 
-double MomContEqIncompNewton::m_computeTauPSPG(const Element& element) const
+template<unsigned short dim>
+double MomContEqIncompNewton<dim>::m_computeTauPSPG(const Element& element) const
 {
-    const double h = std::sqrt(m_pMesh->getRefElementSize(m_pMesh->getDim())*element.getDetJ()/M_PI);
+    const double h = std::sqrt(m_pMesh->getRefElementSize(dim)*element.getDetJ()/M_PI);
+    constexpr unsigned short nodPerEl = dim + 1;
 
     double U = 0;
-    for (unsigned short n = 0 ; n < m_pMesh->getNodesPerElm() ; ++n)
+    for (unsigned short n = 0 ; n < nodPerEl ; ++n)
     {
         const Node& node = m_pMesh->getNode(element.getNodeIndex(n));
 
         double nodeU = 0;
-        for (unsigned short d = 0 ; d < m_pMesh->getDim() ; ++d)
+        for (unsigned short d = 0 ; d < dim ; ++d)
         {
             nodeU += node.getState(d)*node.getState(d);
         }
@@ -263,7 +257,8 @@ double MomContEqIncompNewton::m_computeTauPSPG(const Element& element) const
                         + 9*(4*m_mu/(h*h*m_rho))*(4*m_mu/(h*h*m_rho)));
 }
 
-void MomContEqIncompNewton::m_setupPicardPSPG(unsigned int maxIter, double minRes)
+template<unsigned short dim>
+void MomContEqIncompNewton<dim>::m_setupPicardPSPG(unsigned int maxIter, double minRes)
 {
     m_pPicardAlgo = std::make_unique<PicardAlgo>([&](const auto& qPrevVec){
         m_clock.start();
@@ -275,14 +270,17 @@ void MomContEqIncompNewton::m_setupPicardPSPG(unsigned int maxIter, double minRe
         m_accumalatedTimes["Save/restore nodelist"] += m_clock.end();
     },
     [&](auto& qIterVec, const auto& qPrevVec){
-        m_buildAbPSPG(m_A, m_b, qPrevVec[0]);
+        m_buildAbPSPG(qPrevVec[0]);
         m_clock.start();
-        m_applyBCPSPG(m_A, m_b, qPrevVec[0]);
+        m_applyBCPSPG(qPrevVec[0]);
         m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
 
         m_clock.start();
-        m_solver.compute(m_A);
-        m_accumalatedTimes["Compute A matrix"] += m_clock.end();
+        m_solver.analyzePattern(m_A);
+        m_accumalatedTimes["Analyse pattern of A matrix"] += m_clock.end();
+        m_clock.start();
+        m_solver.factorize(m_A);
+        m_accumalatedTimes["Factorize A matrix"] += m_clock.end();
 
         if(m_solver.info() == Eigen::Success)
         {
@@ -308,29 +306,52 @@ void MomContEqIncompNewton::m_setupPicardPSPG(unsigned int maxIter, double minRe
     },
     [&](const auto& qIterVec, const auto& qIterPrevVec) -> double {
         m_clock.start();
-        double num = 0, den = 0;
         Mesh* p_Mesh = this->m_pMesh;
+        const std::size_t nNodes = p_Mesh->getNodesCount();
+        double resV = 0, resP = 0;
 
-        for(std::size_t n = 0 ; n < p_Mesh->getNodesCount() ; ++n)
+        double num = 0, den = 0;
+        for(std::size_t n = 0 ; n < nNodes ; ++n)
         {
             const Node& node = p_Mesh->getNode(n);
 
             if(!node.isFree())
             {
-                for(unsigned short d = 0 ; d < p_Mesh->getDim() ; ++d)
+                for(unsigned short d = 0 ; d < dim ; ++d)
                 {
-                    num += (qIterVec[0](n + d*p_Mesh->getNodesCount()) - qIterPrevVec[0](n + d*p_Mesh->getNodesCount()))*(qIterVec[0](n + d*p_Mesh->getNodesCount()) - qIterPrevVec[0](n + d*p_Mesh->getNodesCount()));
-                    den += qIterPrevVec[0](n + d*p_Mesh->getNodesCount())*qIterPrevVec[0](n + d*p_Mesh->getNodesCount());
+                    num += (qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes))*(qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes));
+                    den += qIterPrevVec[0](n + d*nNodes)*qIterPrevVec[0](n + d*nNodes);
                 }
             }
         }
 
-        double res;
         if(den == 0)
-            res = std::numeric_limits<double>::max();
+            resV = std::numeric_limits<double>::max();
         else
-            res = std::sqrt(num/den);
+            resV = std::sqrt(num/den);
+
+        if(m_computePres)
+        {
+            num = 0, den = 0;
+            for(std::size_t n = 0 ; n < nNodes ; ++n)
+            {
+                const Node& node = p_Mesh->getNode(n);
+
+                if(!node.isFree())
+                {
+                    num += (qIterVec[0](n + dim*nNodes) - qIterPrevVec[0](n + dim*nNodes))*(qIterVec[0](n + dim*nNodes) - qIterPrevVec[0](n + dim*nNodes));
+                    den += qIterPrevVec[0](n + dim*nNodes)*qIterPrevVec[0](n + dim*nNodes);
+                }
+            }
+
+            if(den == 0)
+                resP = std::numeric_limits<double>::max();
+            else
+                resP = std::sqrt(num/den);
+        }
+
         m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
-        return res;
+
+        return std::max(resV, resP);
     }, maxIter, minRes);
 }

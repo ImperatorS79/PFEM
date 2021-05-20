@@ -7,7 +7,8 @@
 class Problem;
 class Mesh;
 
-class SIMULATION_API ContEqWCompNewton : public Equation
+template<unsigned short dim>
+class ContEqWCompNewton : public Equation
 {
     public:
         ContEqWCompNewton(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
@@ -21,7 +22,7 @@ class SIMULATION_API ContEqWCompNewton : public Equation
 
         void displayParams() const override;
 
-        double getSpeedEquiv(double he, const Node& node) override;
+        double getSquaredSpeedEquiv(const Node& node) const override;
         bool solve() override;
         void preCompute() override;
 
@@ -37,18 +38,22 @@ class SIMULATION_API ContEqWCompNewton : public Equation
         bool m_enableStab;
         double m_keStab;
 
-        std::unique_ptr<MatrixBuilder> m_pMatBuilder2; // TO DO: change mat builder to allow multiple M functions
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder;
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder2; // TO DO: change mat builder to allow multiple M functions
 
+        Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invM;
         Eigen::VectorXd m_F0;
 
-        void m_buildF0(Eigen::VectorXd& F0);
-        void m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
-        void m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
+        void m_buildF0();
+        void m_buildSystem();
+        void m_applyBC();
         Eigen::VectorXd m_getPFromRhoTaitMurnagham(const Eigen::VectorXd& rho);
 
-        void m_buildSystemFIC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
-        void m_applyBCFIC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& invM, Eigen::VectorXd& F);
+        void m_buildSystemFIC();
+        void m_applyBCFIC();
         double m_computeTauFIC(const Element& element) const;
 };
+
+#include "ContEquation.inl"
 
 #endif // CONTEQWCOMPNEWTON_HPP_INCLUDED

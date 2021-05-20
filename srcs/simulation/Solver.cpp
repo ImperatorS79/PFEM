@@ -17,7 +17,11 @@ m_pProblem(pProblem)
 
     m_id = m_solverParams[0].checkAndGet<std::string>("id");
 
-    m_nextTimeToRemesh = 10;
+    m_adaptDT = m_solverParams[0].checkAndGet<bool>("adaptDT");
+    m_maxDT = m_solverParams[0].checkAndGet<double>("maxDT");
+    m_initialDT = m_solverParams[0].checkAndGet<double>("initialDT");
+
+    m_nextTimeToRemesh = m_maxDT;
 }
 
 Solver::~Solver()
@@ -91,7 +95,7 @@ std::size_t Solver::getAdditionalStateCount() const
     throw std::runtime_error("Unimplemented function by the child class -> Solver::getAdditionalStateCount()");
 }
 
-void Solver::m_conditionalRemesh(std::size_t speedIndex)
+void Solver::m_conditionalRemesh()
 {
     bool force = false;
     if(m_pProblem->getCurrentSimTime() > m_nextTimeToRemesh)
@@ -101,30 +105,7 @@ void Solver::m_conditionalRemesh(std::size_t speedIndex)
         //std::cout << "Remeshing at: " << std::fixed << m_pProblem->getCurrentSimTime() << std::endl;
     }
 
-    double dt = std::numeric_limits<double>::max();
-    for(std::size_t elm = 0 ; elm < m_pMesh->getElementsCount() ; ++elm)
-    {
-        const Element& element = m_pMesh->getElement(elm);
-        double he = 2*element.getRin();
-
-        double maxSpeed = 0;
-        for(std::size_t n = 0 ; n < m_pMesh->getNodesPerElm() ; ++n)
-        {
-            const Node& node = element.getNode(n);
-
-            double u = 0;
-            for(unsigned int d = 0 ; d < m_pMesh->getDim() ; ++d)
-            {
-                u += node.getState(speedIndex + d)*node.getState(speedIndex + d);
-            }
-            u = std::sqrt(u);
-
-            maxSpeed = std::max(u, maxSpeed);
-        }
-        dt = std::min(dt, he/maxSpeed);
-    }
-
-    if(force || m_pProblem->getCurrentSimTime() + dt < m_nextTimeToRemesh)
-        m_nextTimeToRemesh = m_pProblem->getCurrentSimTime() + dt;
+    if(force || m_pProblem->getCurrentSimTime() + m_remeshTimeStep < m_nextTimeToRemesh)
+        m_nextTimeToRemesh = m_pProblem->getCurrentSimTime() + m_remeshTimeStep;
 }
 

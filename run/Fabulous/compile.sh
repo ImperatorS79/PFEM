@@ -54,7 +54,7 @@ rm -rf build
 mkdir build
 cd build
 
-cmake ../ -DCMAKE_BUILD_TYPE=Debug -G "Unix Makefiles"
+cmake ../ -DCMAKE_BUILD_TYPE=Release -DUSE_MARCH=1 -G "Unix Makefiles"
 cmake --build .
 
 cd ../

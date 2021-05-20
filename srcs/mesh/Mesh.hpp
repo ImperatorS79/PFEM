@@ -24,6 +24,7 @@ struct MeshCreateInfo
     double omega = 1e16; /**< A node should be added in the center of an element if \f$ A_{elm} > \omega h_{char}^{dim} \f$ */
     std::vector<double> boundingBox = {}; /**< Nodes and elements outised bounding box are deleted. Format:
                                                \f$ [x_{min}, y_{min}, (z_{min}, )x_{max}, y_{max}, (z_{max}) ] \f$ */
+    std::vector<std::vector<double>> exclusionZones = {};
     std::string mshFile = {}; /**< The path to the .msh file to load */
     bool addOnFS = true;
     bool deleteFlyingNodes = false;
@@ -206,6 +207,7 @@ class MESH_API Mesh
         double m_omega; /**< Control the addition of node if a triangle is too big (a node is added if A_triangle > omege*hchar^2). */
         double m_gamma; /**< Control the deletetion of node if two are too close to each other (a node is deleted if d_nodes < gamma*hchar). */
         std::vector<double> m_boundingBox; /**< Box delimiting the zone of nodes existence (format: [xmin, ymin, xmax, ymax]). */
+        std::vector<std::vector<double>> m_exclusionZones;
         bool m_addOnFS;
         bool m_deleteFlyingNodes;
 
@@ -246,6 +248,8 @@ class MESH_API Mesh
 
         /// \brief Compute the normal and curvature of each boundary and free surface (3D).
         void computeFSNormalCurvature3D();
+
+        void laplacianSmoothingBoundaries();
 
         /**
          * \brief Load the nodes from a file using gmsh.

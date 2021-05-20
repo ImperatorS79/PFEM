@@ -4,37 +4,35 @@ Problem = {
 	verboseOutput = true,
 	
 	Mesh = {
-		hchar = 0.1,
+		hchar = 0.025,
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-0.1, -1.6, 5, 1.6},
-		exclusionZones = {},
-		mshFile = "examples/2D/cylinder/geometry.msh"
+		boundingBox = {-0.1, -0.6, -0.1, 4, 0.6, 100},
+		exclusionZones = {{2.396, -0.2, 0, 2.556, 0.2, 0.16}},
+		mshFile = "examples/3D/damBreakWithObstacle/geometry.msh"
 	},
 	
 	Extractors = {
 		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.1,
+			timeBetweenWriting = 0.02,
 			whatToWrite = {"p", "ke"},
 			writeAs = "NodesElements" 
 		}
 	},
 	
 	Material = {
-		mu = 200,
+		mu = 1e-3,
 		rho = 1000,
 		gamma = 0
 	},
 	
 	IC = {
-		WallsFixed = true,
-		CylinderWallFixed = true,
-		FluidInputFixed = true
+		WallsFixed = true
 	},
 	
 	Solver = {
@@ -42,14 +40,15 @@ Problem = {
 		adaptDT = true,
 		coeffDTincrease = 1.5,
 		coeffDTDecrease = 2,
-		maxDT = 0.001,
-		initialDT = 0.001,
+		maxDT = 0.01,
+		initialDT = 0.01,
 		
 		MomContEq = {
 			minRes = 1e-6,
 			maxIter = 10,
-			bodyForce = {0, 0},
-			gammaFS = 0,
+			bodyForce = {0, 0, -9.81},
+			gammaFS = 0.5,
+			computePres = false,
 			BC = {
 
 			}
@@ -58,25 +57,18 @@ Problem = {
 }
 
 function Problem.IC:initStates(pos)
-	return {1, 0, 0}
-end
-
-function Problem.IC:initWallsStates(pos)
-	return {0, 0, 0}
-end
-
-function Problem.IC:initCylinderWallStates(pos)
-	return {0, 0, 0}
+	local rho = Problem.Material.rho
+	local g = -Problem.Solver.MomContEq.bodyForce[3]
+	local z0 = 0.55
+	
+	if(pos[3] <= z0 and pos[1] <= 1.228 + 1.1*Problem.Mesh.hchar) then
+		local p = rho*g*(z0 - pos[3])
+		return {0, 0, 0, p}
+	else 
+		return {0, 0, 0, 0}
+	end
 end
 
 function Problem.Solver.MomContEq.BC:WallsV(pos, initPos, states, t)
-	return {0, 0}
-end
-
-function Problem.Solver.MomContEq.BC:CylinderWallV(pos, initPos, states, t)
-	return {0, 0}
-end
-
-function Problem.Solver.MomContEq.BC:FluidInputV(pos, initPos, states, t)
-	return {1, 0}
+	return {0, 0, 0}
 end

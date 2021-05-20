@@ -20,11 +20,8 @@ class SIMULATION_API SolverIncompNewton: public Solver
         void computeNextDT() override;
 
     protected:
-        bool m_adaptDT;
 		double m_coeffDTincrease;
 		double m_coeffDTDecrease;
-		double m_maxDT;
-		double m_initialDT;
 
 		bool m_solveHeatFirst;
 		bool m_useIterativSolver;

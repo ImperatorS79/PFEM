@@ -6,6 +6,11 @@
 #include "../../utility/StatesFromToQ.hpp"
 #include "../../utility/Clock.hpp"
 
+#define REGISTER_EQ(Eq, dim) \
+std::make_unique<Eq<dim>>( \
+    m_pProblem, this, m_pMesh, m_solverParams, materialParams, \
+    bcFlags, statesIndex \
+); \
 
 SolverWCompNewton::SolverWCompNewton(Problem* pProblem, Mesh* pMesh, std::vector<SolTable> problemParams):
 Solver(pProblem, pMesh, problemParams)
@@ -36,17 +41,17 @@ Solver(pProblem, pMesh, problemParams)
 
 		bcFlags = {0};
 		statesIndex = {dim, dim + 1, 0};
-		m_pEquations[0] = std::make_unique<ContEqWCompNewton>(
-			m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-			bcFlags, statesIndex
-		);
+		if(m_pMesh->getDim() == 2)
+            m_pEquations[0] = REGISTER_EQ(ContEqWCompNewton, 2)
+        else
+            m_pEquations[0] = REGISTER_EQ(ContEqWCompNewton, 3)
 
 		bcFlags = {0};
 		statesIndex = {0, dim + 2, dim, dim + 1};
-		m_pEquations[1] = std::make_unique<MomEqWCompNewton>(
-			m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-			bcFlags, statesIndex
-		);
+		if(m_pMesh->getDim() == 2)
+            m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 2)
+        else
+            m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 3)
 
         //Set the right node flag if the boundary condition is present
         SolTable bcParam = m_pEquations[1]->getBCParam(0);
@@ -71,24 +76,24 @@ Solver(pProblem, pMesh, problemParams)
 
         bcFlags = {0};
 		statesIndex = {dim, dim + 1, 0, 2*dim + 2};
-		m_pEquations[0] = std::make_unique<ContEqWCompNewton>(
-			m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-			bcFlags, statesIndex
-		);
+		if(m_pMesh->getDim() == 2)
+            m_pEquations[0] = REGISTER_EQ(ContEqWCompNewton, 2)
+        else
+            m_pEquations[0] = REGISTER_EQ(ContEqWCompNewton, 3)
 
 		bcFlags = {0};
 		statesIndex = {0, dim + 2, dim, dim + 1, 2*dim + 2};
-		m_pEquations[1] = std::make_unique<MomEqWCompNewton>(
-			m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-			bcFlags, statesIndex
-		);
+		if(m_pMesh->getDim() == 2)
+            m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 2)
+        else
+            m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 3)
 
         bcFlags = {1, 2}; //Dirichlet and Neumann
         statesIndex = {2*dim + 2, dim + 1};
-        m_pEquations[2] = std::make_unique<HeatEqWCompNewton>(
-            m_pProblem, this, m_pMesh, m_solverParams, materialParams,
-            bcFlags, statesIndex
-        );
+        if(m_pMesh->getDim() == 2)
+            m_pEquations[2] = REGISTER_EQ(HeatEqWCompNewton, 2)
+        else
+            m_pEquations[2] = REGISTER_EQ(HeatEqWCompNewton, 3)
 
         //Set the right node flag if the boundary condition is present
         SolTable bcParamMomCont = m_pEquations[1]->getBCParam(0);
@@ -120,12 +125,7 @@ Solver(pProblem, pMesh, problemParams)
         m_solveFunc = std::bind(&SolverWCompNewton::m_solveBoussinesqWC, this);
 	}
 
-    m_adaptDT = m_solverParams[0].checkAndGet<bool>("adaptDT");
-    m_maxDT = m_solverParams[0].checkAndGet<double>("maxDT");
-    m_initialDT = m_solverParams[0].checkAndGet<double>("initialDT");
     m_securityCoeff = m_solverParams[0].checkAndGet<double>("securityCoeff");
-
-    m_nextTimeToRemesh = m_maxDT;
 
     m_timeStep = m_initialDT;
 
@@ -170,29 +170,43 @@ void SolverWCompNewton::computeNextDT()
 {
     if(m_adaptDT)
     {
+        bool heat = false;
+        if(m_pProblem->getID() == "BoussinesqWC")
+            heat = true;
+
         m_timeStep = std::numeric_limits<double>::max();
+        m_remeshTimeStep = std::numeric_limits<double>::max();
         #pragma omp parallel for reduction(min:m_timeStep)
         for(std::size_t elm = 0 ; elm < m_pMesh->getElementsCount() ; ++elm)
         {
             const Element& element = m_pMesh->getElement(elm);
-            double he = 2*element.getRin();
+            double he = element.getRin();
 
-            double maxSpeed = 0;
+            double maxSquaredSpeedFluidPressureVN = 0;
+            double maxSquaredSpeedFluid = 0;
             for(std::size_t n = 0 ; n < m_pMesh->getNodesPerElm() ; ++n)
             {
                 const Node& node = element.getNode(n);
 
-                double c = m_pEquations[0]->getSpeedEquiv(he, node);
-                double u = m_pEquations[1]->getSpeedEquiv(he, node);
+                double c2 = m_pEquations[0]->getSquaredSpeedEquiv(node);
+                double u2 = m_pEquations[1]->getSquaredSpeedEquiv(node);
+                double alpha = m_pEquations[1]->getDiffusionParam(node);
+                if(heat)
+                    alpha = std::max(alpha, m_pEquations[2]->getDiffusionParam(node));
 
-                maxSpeed = std::max(std::max(u, c), maxSpeed);
+                maxSquaredSpeedFluidPressureVN = std::max(std::max(u2, c2), maxSquaredSpeedFluidPressureVN);
+                maxSquaredSpeedFluidPressureVN = std::max(maxSquaredSpeedFluidPressureVN, 4*alpha*alpha/(he*he));
+                maxSquaredSpeedFluid = std::max(maxSquaredSpeedFluid, u2);
             }
-            m_timeStep = std::min(m_timeStep, m_securityCoeff*he/maxSpeed);
+            m_timeStep = std::min(m_timeStep, m_securityCoeff*m_securityCoeff*he*he/maxSquaredSpeedFluidPressureVN);
+            m_remeshTimeStep = std::max(m_remeshTimeStep, maxSquaredSpeedFluid);
         }
 
-        m_timeStep = std::min(m_timeStep, m_maxDT);
-        if(std::isnan(m_timeStep) || std::isinf(m_timeStep))
-            m_timeStep = m_maxDT;
+        m_timeStep = std::min(std::sqrt(m_timeStep), m_maxDT);
+        m_remeshTimeStep = std::min(std::sqrt(m_remeshTimeStep), m_maxRemeshDT);
+
+        if(std::isnan(m_timeStep) || std::isnan(m_remeshTimeStep))
+            throw std::runtime_error("NaN time step!");
     }
 }
 

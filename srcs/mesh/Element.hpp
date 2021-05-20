@@ -18,11 +18,20 @@ class Node;
 class MESH_API Element
 {
     public:
+        Element()                                   = default;
         /// \param mesh a reference to the mesh
         Element(Mesh& mesh);
         Element(const Element& element)             = default;
         Element(Element&& element)                  = default;
         ~Element()                                  = default;
+
+        /// \param neighbourElmIndex The index of the neighbour element inside the element.
+        /// \return A constant reference to the element.
+        const Element& getNeighbourElement(unsigned int neighbourElmIndex) const noexcept;
+
+        /// \param neighbourElmIndex The index of the neighbour element inside the element.
+        /// \return The index of the element inside the mesh.
+        inline std::size_t getNeighbourElmIndex(unsigned int neighbourElmIndex) const noexcept;
 
         /// \param nodeElmIndex The index of the node inside the element.
         /// \return A constant reference to the node.
@@ -102,6 +111,7 @@ class MESH_API Element
         Mesh* m_pMesh;                                  /**< A pointer to the mesh from which the facet comes from. */
 
         std::vector<std::size_t> m_nodesIndexes;        /**< Indexes of the nodes in the nodes list which compose this element. */
+        std::vector<std::size_t> m_neighbourElements;
 
         double m_detJ;                                  /**< Determinant of the Jacobian matrix of the element. */
         std::array<std::array<double, 3>, 3> m_J;       /**< Jacobian matrix of the element. */

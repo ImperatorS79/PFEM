@@ -5,6 +5,11 @@ inline double Element::getDetJ() const noexcept
     return m_detJ;
 }
 
+inline std::size_t Element::getNeighbourElmIndex(unsigned int neighbourElmIndex) const noexcept
+{
+    return m_neighbourElements[neighbourElmIndex];
+}
+
 inline std::size_t Element::getNodeIndex(unsigned int node) const noexcept
 {
     return m_nodesIndexes[node];

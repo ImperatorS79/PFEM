@@ -17,7 +17,8 @@
 class Problem;
 class Mesh;
 
-class SIMULATION_API HeatEqIncompNewton : public Equation
+template<unsigned short dim>
+class HeatEqIncompNewton : public Equation
 {
     public:
         HeatEqIncompNewton(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
@@ -34,6 +35,7 @@ class SIMULATION_API HeatEqIncompNewton : public Equation
         bool solve() override;
 
     private:
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder; /**< Class responsible of building the required matrices. */
         std::unique_ptr<PicardAlgo> m_pPicardAlgo;
         Eigen::SparseMatrix<double> m_A;
         Eigen::VectorXd m_b;
@@ -44,10 +46,12 @@ class SIMULATION_API HeatEqIncompNewton : public Equation
         double m_cv;
         double m_rho;
 
-        void m_buildAb(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev);
-        void m_applyBC(Eigen::SparseMatrix<double>& A, Eigen::VectorXd& b, const Eigen::VectorXd& qPrev);
+        void m_buildAb(const Eigen::VectorXd& qPrev);
+        void m_applyBC(const Eigen::VectorXd& qPrev);
 
         double m_computeTauPSPG(const Element& element) const;
 };
+
+#include "HeatEquation.inl"
 
 #endif // HEATEQINCOMPNEWTON_HPP_INCLUDED

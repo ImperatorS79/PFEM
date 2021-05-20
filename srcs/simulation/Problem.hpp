@@ -68,6 +68,14 @@ class SIMULATION_API Problem
         /// \return The value of the mesh data.
         std::vector<double> getMeshWrittableData(const std::string& name, std::size_t nodeIndex) const;
 
+        /// \return A vector containing the name of the boundary data which can be extracted for this problem.
+        virtual std::vector<std::string> getBoundaryWrittableDataName() const;
+
+        /// \param name The name of the boundary data to write.
+        /// \param name The name of the boundary from which to extract data.
+        /// \return The value of the boundary data.
+        virtual std::vector<double> getBoundaryWrittableData(const std::string& name, const std::string& boundaryName) const;
+
         inline const Mesh& getMesh() const noexcept;
         inline const Solver& getSolver() const noexcept;
         inline double getCurrentSimTime() const noexcept;

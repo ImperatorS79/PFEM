@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-0.1, -0.1, 5, 1.1},
+		exclusionZones = {},
 		mshFile = "examples/2D/pipe/geometry.msh"
 	},
 	
@@ -47,6 +48,7 @@ Problem = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, 0},
+			computePres = false,
 			BC = {
 
 			}

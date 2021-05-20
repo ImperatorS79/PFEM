@@ -7,7 +7,8 @@
 class Problem;
 class Mesh;
 
-class SIMULATION_API MomEqWCompNewton : public Equation
+template<unsigned short dim>
+class MomEqWCompNewton : public Equation
 {
     public:
         MomEqWCompNewton(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
@@ -21,20 +22,28 @@ class SIMULATION_API MomEqWCompNewton : public Equation
 
         void displayParams() const override;
 
-        double getSpeedEquiv(double he, const Node& node) override;
+        double getSquaredSpeedEquiv(const Node& node) const override;
+        double getDiffusionParam(const Node& node) const override;
         bool solve() override;
         void setQVhalf(Eigen::VectorXd qV1half);
 
     private:
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder;
+
         double m_mu;
         double m_gamma;
         double m_alpha;
         double m_Tr;
 
-        Eigen::VectorXd m_bodyForce;
+        Eigen::Matrix<double, dim, 1> m_bodyForce;
 
-        void m_buildSystem(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& A, Eigen::VectorXd& b);
-        void m_applyBC(Eigen::DiagonalMatrix<double,Eigen::Dynamic>& A, Eigen::VectorXd& b);
+        Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invM;
+        Eigen::VectorXd m_F;
+
+        void m_buildSystem();
+        void m_applyBC();
 };
+
+#include "MomEquation.inl"
 
 #endif // MOMEQWCOMPNEWTON_HPP_INCLUDED

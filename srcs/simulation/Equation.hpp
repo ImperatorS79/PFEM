@@ -24,7 +24,7 @@ class Node;
  * This class is responsible of solving one equation and update the corresponding
  * mesh states accordingly.
  */
-class SIMULATION_API Equation
+class Equation
 {
     public:
         Equation(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
@@ -53,10 +53,13 @@ class SIMULATION_API Equation
         /// \return Does this equation requires the computation of normals and curvatures (child class should set m_needNormalCurv) ?
         bool isNormalCurvNeeded() const noexcept;
 
-        /// \param he The element characteristic size.
         /// \param node The node on which the speed is calculated.
         /// \return An equivalent speed if the problem is solved using an explicit method.
-        virtual double getSpeedEquiv(double he, const Node& node);
+        virtual double getSquaredSpeedEquiv(const Node& node) const;
+
+        /// \param node The node on which the speed is calculated.
+        /// \return The diffusion coefficient in the Von Neumann number.
+        virtual double getDiffusionParam(const Node& node) const;
 
         /// \brief A function to precompute data for the equation of needed.
         virtual void preCompute();
@@ -81,8 +84,6 @@ class SIMULATION_API Equation
 
         std::map<std::string, double> m_accumalatedTimes;  /**< Accumulated time in each part of the solver*/
         Clock m_clock;
-
-        std::unique_ptr<MatrixBuilder> m_pMatBuilder; /**< Class responsible of building the required matrices. */
 };
 
 #endif // EQUATION_HPP_INCLUDED

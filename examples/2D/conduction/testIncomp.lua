@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-1, -0.25, 5, 1.25},
+		exclusionZones = {},
 		mshFile = "examples/2D/conduction/geometry.msh"
 	},
 	

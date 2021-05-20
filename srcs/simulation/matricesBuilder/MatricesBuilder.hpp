@@ -5,42 +5,66 @@
 #include <functional>
 #include <Eigen/Dense>
 
+#include "../simulation_defines.h"
+
 class Element;
 class Facet;
 class Mesh;
 
-using matFuncElm = std::function<double(const Element& /** element **/, const Eigen::MatrixXd& /** N **/, const Eigen::MatrixXd& /** B **/)>;
-using simpleMatFuncElm = std::function<double(const Element& /** element **/, const Eigen::MatrixXd& /** N **/)>;
-using simpleMatFuncFacet = std::function<double(const Facet& /** facet **/, const Eigen::MatrixXd& /** N **/)>;
-using qFuncFacet = std::function<Eigen::VectorXd(const Facet& /** facet **/, const std::array<double, 3>& /** gp **/)>;
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
+using NmatTypeHD = Eigen::Matrix<double, 1, noPerEl>;
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
+using NmatTypeLD = Eigen::Matrix<double, 1, noPerEl - 1>;
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
+using BmatType = Eigen::Matrix<double, dim*dim - 2*dim +3, dim*noPerEl>;
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
+using GradNmatType = Eigen::Matrix<double, dim, noPerEl> ;
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
+using DdevMatType = Eigen::Matrix<double, dim*dim - 2*dim +3, dim*dim - 2*dim +3>;
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
+using mVecType = Eigen::Matrix<double, dim*dim - 2*dim + 3, 1>;
 
 /**
  * \class MatrixBuilder
  * \brief Class responsible to hold code for building matrices.
  */
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
 class MatrixBuilder
 {
+
+    using NmatTypeHD = Eigen::Matrix<double, 1, noPerEl>;
+    using NmatTypeLD = Eigen::Matrix<double, 1, noPerEl - 1>;
+    using BmatType = Eigen::Matrix<double, dim*dim - 2*dim + 3, dim*(noPerEl)>;
+    using GradNmatType = Eigen::Matrix<double, dim, noPerEl> ;
+    using DdevMatType = Eigen::Matrix<double, dim*dim - 2*dim +3, dim*dim - 2*dim +3>;
+    using mVecType = Eigen::Matrix<double, dim*dim - 2*dim + 3, 1>;
+    using matFuncElm = std::function<double(const Element&, const NmatTypeHD&, const BmatType&)>;
+    using matFuncKElm = std::function<double(const Element&, const NmatTypeHD&, const BmatType&, const DdevMatType&)>;
+    using simpleMatFuncElm = std::function<double(const Element&, const NmatTypeHD&)>;
+    using simpleMatFuncFacet = std::function<double(const Facet&, const NmatTypeLD&)>;
+    using qFuncFacet = std::function<Eigen::Matrix<double, dim, 1>(const Facet&, const std::array<double, 3>& /** gp **/)>;
+
 	public:
 		MatrixBuilder(const Mesh& mesh, unsigned int nGPHD, unsigned int nGPLD);
 		~MatrixBuilder();
 
-		Eigen::MatrixXd getB(Eigen::MatrixXd gradN);
-		Eigen::MatrixXd getGradN(const Element& element);
-		Eigen::MatrixXd getM(const Element& element);
-		Eigen::MatrixXd getMGamma(const Facet& facet);
-		Eigen::MatrixXd getK(const Element& element, const Eigen::MatrixXd& B);
-		Eigen::MatrixXd getD(const Element& element, const Eigen::MatrixXd& B);
-		Eigen::MatrixXd getL(const Element& element, const Eigen::MatrixXd& B, const Eigen::MatrixXd& gradN);
-		Eigen::MatrixXd getC(const Element& element, const Eigen::MatrixXd& B, const Eigen::MatrixXd& gradN);
-		Eigen::VectorXd getF(const Element& element, const Eigen::VectorXd& vec, const Eigen::MatrixXd& B);
-		Eigen::VectorXd getH(const Element& element, const Eigen::VectorXd& vec, const Eigen::MatrixXd& B, const Eigen::MatrixXd& gradN);
-		Eigen::VectorXd getQN(const Facet& facet);
+		BmatType getB(const GradNmatType& gradN);
+		GradNmatType getGradN(const Element& element);
+		Eigen::Matrix<double, noPerEl, noPerEl>                 getM(const Element& element);
+		Eigen::Matrix<double, noPerEl - 1, noPerEl - 1>         getMGamma(const Facet& facet);
+		Eigen::Matrix<double, dim*noPerEl, dim*noPerEl>         getK(const Element& element, const BmatType& B);
+		Eigen::Matrix<double, noPerEl, dim*noPerEl>             getD(const Element& element, const BmatType& B);
+		Eigen::Matrix<double, noPerEl, noPerEl>                 getL(const Element& element, const BmatType& B, const GradNmatType& gradN);
+		Eigen::Matrix<double, noPerEl, dim*noPerEl>             getC(const Element& element, const BmatType& B, const GradNmatType& gradN);
+		Eigen::Matrix<double, dim*noPerEl, 1>                   getF(const Element& element, const Eigen::Matrix<double, dim, 1>& vec, const BmatType& B);
+		Eigen::Matrix<double, noPerEl, 1>                       getH(const Element& element, const Eigen::Matrix<double, dim, 1>& vec, const BmatType& B, const GradNmatType& gradN);
+		Eigen::Matrix<double, dim, 1>                           getQN(const Facet& facet);
 
-		void setddev(Eigen::MatrixXd ddev);
-		void setm(Eigen::VectorXd m);
+		void setddev(DdevMatType ddev);
+		void setm(mVecType m);
 		void setMcomputeFactor(simpleMatFuncElm computeFactor);
 		void setMGammacomputeFactor(simpleMatFuncFacet computeFactor);
-		void setKcomputeFactor(matFuncElm computeFactor);
+		void setKcomputeFactor(matFuncKElm computeFactor);
 		void setDcomputeFactor(matFuncElm computeFactor);
 		void setLcomputeFactor(matFuncElm computeFactor);
 		void setCcomputeFactor(matFuncElm computeFactor);
@@ -48,13 +72,10 @@ class MatrixBuilder
 		void setHcomputeFactor(matFuncElm computeFactor);
 		void setQFunc(qFuncFacet func);
 
-		static Eigen::DiagonalMatrix<double, Eigen::Dynamic> lump2(const Eigen::MatrixXd& mat)
+		template <unsigned short Size>
+		static Eigen::DiagonalMatrix<double, Size> lump2(const Eigen::Matrix<double, Size, Size>& mat)
 		{
-            if(mat.cols() != mat.rows())
-                throw std::runtime_error("only square matrices can be lumped!");
-
-            Eigen::DiagonalMatrix<double, Eigen::Dynamic> lumpedMat;
-            lumpedMat.resize(mat.rows());
+            Eigen::DiagonalMatrix<double, Size> lumpedMat;
             lumpedMat.setZero();
 
             auto& lumpedMatDiag = lumpedMat.diagonal();
@@ -68,11 +89,9 @@ class MatrixBuilder
             return lumpedMat;
         }
 
-        static void lump(Eigen::MatrixXd& mat)
+        template <unsigned short Size>
+        static void lump(Eigen::Matrix<double, Size, Size>& mat)
 		{
-            if(mat.cols() != mat.rows())
-                throw std::runtime_error("only square matrices can be lumped!");
-
             for(auto i = 0; i < mat.cols() ; ++i)
             {
                 for(auto j = 0; j < mat.cols() ; ++j)
@@ -86,15 +105,24 @@ class MatrixBuilder
             }
         }
 
-		static Eigen::MatrixXd diagBlock(const Eigen::MatrixXd& mat, unsigned int nBlocks)
+		static Eigen::Matrix<double, dim*noPerEl, dim*noPerEl> diagBlock(const Eigen::Matrix<double, noPerEl, noPerEl>& mat)
         {
-            if(mat.cols() != mat.rows())
-                throw std::runtime_error("only square matrices can be diagonalized!");
+            Eigen::Matrix<double, dim*noPerEl, dim*noPerEl> finalMat;
+            finalMat.setZero();
 
-            Eigen::MatrixXd finalMat(mat.cols()*nBlocks, mat.cols()*nBlocks); finalMat.setZero();
+            for(unsigned int i = 0 ; i < dim ; ++i)
+                finalMat.block(i*mat.rows(), i*mat.cols(), mat.rows(), mat.cols()) = mat;
 
-            for(unsigned int i = 0 ; i < nBlocks ; ++i)
-                finalMat.block(i*mat.cols(), i*mat.cols(), mat.cols(), mat.cols()) = mat;
+            return finalMat;
+        }
+
+        static Eigen::Matrix<double, dim*dim, dim*dim> diagBlock(const Eigen::Matrix<double, dim, dim>& mat)
+        {
+            Eigen::Matrix<double, dim*dim, dim*dim> finalMat;
+            finalMat.setZero();
+
+            for(unsigned int i = 0 ; i < dim ; ++i)
+                finalMat.block(i*mat.rows(), i*mat.cols(), mat.rows(), mat.cols()) = mat;
 
             return finalMat;
         }
@@ -123,21 +151,21 @@ class MatrixBuilder
         std::vector<std::vector<double>> m_sfsLD; /**< Element shape functions evaluated at each Gauss Points for facets. **/
         std::vector<std::vector<double>> m_gradsfsLD; /**< Element gradient of shape functions for facets (constant). **/
 
-        std::vector<Eigen::MatrixXd> m_NHD;
-        std::vector<Eigen::MatrixXd> m_NhdTNhd;
-        Eigen::MatrixXd m_sum_NhdTNhd_w;
-        std::vector<Eigen::MatrixXd> m_NLD;
-        std::vector<Eigen::MatrixXd> m_NldTNld;
-        Eigen::MatrixXd m_sum_NldTNld_w;
-        std::vector<Eigen::MatrixXd> m_NHDtilde;
-        std::vector<Eigen::MatrixXd> m_NLDtilde;
+        std::vector<NmatTypeHD> m_NHD;
+        std::vector<Eigen::Matrix<double, noPerEl, noPerEl>> m_NhdTNhd;
+        Eigen::Matrix<double, noPerEl, noPerEl> m_sum_NhdTNhd_w;
+        std::vector<NmatTypeLD> m_NLD;
+        std::vector<Eigen::Matrix<double, noPerEl - 1, noPerEl - 1>> m_NldTNld;
+        Eigen::Matrix<double, noPerEl - 1, noPerEl - 1> m_sum_NldTNld_w;
+        std::vector<Eigen::Matrix<double, dim, dim*noPerEl>> m_NHDtilde;
+        std::vector<Eigen::Matrix<double, dim, dim*(noPerEl - 1)>> m_NLDtilde;
 
-        Eigen::MatrixXd m_ddev;
-        Eigen::VectorXd m_m;
+        DdevMatType m_ddev;
+        mVecType m_m;
 
         simpleMatFuncElm m_Mfunc;
         simpleMatFuncFacet m_MGammafunc;
-        matFuncElm m_Kfunc;
+        matFuncKElm m_Kfunc;
         matFuncElm m_Dfunc;
         matFuncElm m_Lfunc;
         matFuncElm m_Cfunc;
@@ -145,5 +173,7 @@ class MatrixBuilder
         matFuncElm m_Hfunc;
         qFuncFacet m_QFunc;
 };
+
+#include "MatricesBuilder.inl"
 
 #endif // MATRIXBUILDER_HPP_INCLUDED

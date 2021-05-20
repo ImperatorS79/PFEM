@@ -4,18 +4,25 @@
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include <CGAL/Triangulation_cell_base_with_info_3.h>
 #include <CGAL/Delaunay_triangulation_3.h>
 #include <CGAL/Fixed_alpha_shape_3.h>
 #include <CGAL/Fixed_alpha_shape_vertex_base_3.h>
 #include <CGAL/Fixed_alpha_shape_cell_base_3.h>
 #include <Eigen/Dense>
 
+struct CellInfo
+{
+    bool keep = false;
+    std::size_t index;
+};
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel                     Kernel;
 typedef Kernel::FT                                                              FT;
 typedef CGAL::Triangulation_vertex_base_with_info_3<std::size_t, Kernel>        Vb3;
+typedef CGAL::Triangulation_cell_base_with_info_3<CellInfo, Kernel>             Cb3;
 typedef CGAL::Fixed_alpha_shape_vertex_base_3<Kernel, Vb3>                      asVb3;
-typedef CGAL::Fixed_alpha_shape_cell_base_3<Kernel>                             asCb3;
+typedef CGAL::Fixed_alpha_shape_cell_base_3<Kernel, Cb3>                        asCb3;
 typedef CGAL::Triangulation_data_structure_3<asVb3, asCb3>                      asTds3;
 typedef CGAL::Delaunay_triangulation_3<Kernel, asTds3, CGAL::Fast_location>     asTriangulation_3;
 typedef CGAL::Fixed_alpha_shape_3<asTriangulation_3>                            Alpha_shape_3;
@@ -45,6 +52,7 @@ void Mesh::triangulateAlphaShape3D()
         m_nodesList[i].m_facets.clear();
     }
 
+
     const Alpha_shape_3 as(pointsList.begin(), pointsList.end(), m_alpha*m_alpha*m_hchar*m_hchar);
 
     auto checkCellDeletion = [&](Alpha_shape_3::Cell_handle cell) -> bool
@@ -52,11 +60,30 @@ void Mesh::triangulateAlphaShape3D()
         std::size_t in0 = cell->vertex(0)->info(), in1 = cell->vertex(1)->info(),
                     in2 = cell->vertex(2)->info(), in3 = cell->vertex(3)->info();
 
+        if(in0 == in2 || in0 == in1 || in0 == in3 || in1 == in2 || in1 == in3 || in2 == in3)
+            return true;
+
         Tetrahedron_3 tetrahedron(pointsList[in0].first, pointsList[in1].first,
                                   pointsList[in2].first, pointsList[in3].first);
 
-        if(tetrahedron.volume() < 1e-4*m_hchar*m_hchar*m_hchar)
+        if(tetrahedron.volume() < 0.02*m_hchar*m_hchar*m_hchar)
             return true;
+
+        double meanX = (m_nodesList[in0].getCoordinate(0) + m_nodesList[in1].getCoordinate(0)
+                        + m_nodesList[in2].getCoordinate(0) + m_nodesList[in3].getCoordinate(0))/4;
+
+        double meanY = (m_nodesList[in0].getCoordinate(1) + m_nodesList[in1].getCoordinate(1)
+                        + m_nodesList[in2].getCoordinate(1) + m_nodesList[in3].getCoordinate(1))/4;
+
+        double meanZ = (m_nodesList[in0].getCoordinate(2) + m_nodesList[in1].getCoordinate(2)
+                        + m_nodesList[in2].getCoordinate(2) + m_nodesList[in3].getCoordinate(2))/4;
+
+        for(auto& exclusionZone : m_exclusionZones)
+        {
+            if (meanX > exclusionZone[0] && meanY > exclusionZone[1] && meanZ > exclusionZone[2] &&
+                meanX < exclusionZone[3] && meanY < exclusionZone[4] && meanZ < exclusionZone[5])
+                return true;
+        }
 
         if(m_nodesList[in0].isBound() && m_nodesList[in1].isBound() &&
            m_nodesList[in2].isBound() && m_nodesList[in3].isBound())
@@ -64,13 +91,22 @@ void Mesh::triangulateAlphaShape3D()
             for(unsigned int i = 0 ; i < 4 ; ++i)
             {
                 std::set<Alpha_shape_3::Vertex_handle> neighbourVh;
-                as.adjacent_vertices(cell->vertex(i), std::inserter(neighbourVh, neighbourVh.begin()));
+                std::vector<Alpha_shape_3::Cell_handle> inc_cells;
+                as.incident_cells(cell->vertex(i), std::back_inserter(inc_cells));
+                for(auto& cellHandle : inc_cells)
+                {
+                    if(as.classify(cellHandle) == Alpha_shape_3::INTERIOR)
+                    {
+                        for(unsigned int j = 0 ; j <= 3 ; ++j)
+                        {
+                            if(!as.is_infinite(cellHandle->vertex(j)))
+                                neighbourVh.insert(cellHandle->vertex(j));
+                        }
+                    }
+                }
 
                 for(auto vh: neighbourVh)
                 {
-                    if(as.is_infinite(vh))
-                        continue;
-
                     if(vh->info() == in0 || vh->info() == in1 || vh->info() == in2 || vh->info() == in3)
                         continue;
 
@@ -88,51 +124,81 @@ void Mesh::triangulateAlphaShape3D()
         return false;
     };
 
+    std::size_t counter = 0;
+    for(auto cit = as.finite_cells_begin() ; cit != as.finite_cells_end() ; ++cit)
+    {
+        if(as.classify(cit) != Alpha_shape_3::INTERIOR)
+            continue;
+
+        const Alpha_shape_3::Cell_handle cell{cit};
+        if(checkCellDeletion(cell))
+            continue;
+
+        cell->info().keep = true;
+        cell->info().index = counter;
+        counter++;
+    }
+
+    if(counter == 0)
+        throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
+
+    m_elementsList.resize(counter);
+
     // We check for each triangle which one will be kept (alpha shape), then we
     // perform operations on the remaining elements
-    for(auto fit = as.finite_cells_begin() ; fit != as.finite_cells_end() ; ++fit)
+    for(auto cit = as.finite_cells_begin() ; cit != as.finite_cells_end() ; ++cit)
     {
-        // If true, the elements are fluid elements
-        if(as.classify(fit) == Alpha_shape_3::INTERIOR)
+        const Alpha_shape_3::Cell_handle cell{cit};
+
+        if(!cell->info().keep)
+            continue;
+
+        const std::size_t elementIndex = cell->info().index;
+
+        const std::size_t in0 = cell->vertex(0)->info(), in1 = cell->vertex(1)->info(),
+                          in2 = cell->vertex(2)->info(), in3 = cell->vertex(3)->info();
+
+        Element element(*this);
+        element.m_nodesIndexes = {in0, in1, in2, in3};
+        element.computeJ();
+        element.computeDetJ();
+        element.computeInvJ();
+
+        std::set<std::size_t> neighborElements;
+        for(unsigned short i = 0 ; i < 4 ; ++i)
         {
-            const Alpha_shape_3::Cell_handle cell{fit};
-
-            std::size_t in0 = cell->vertex(0)->info(), in1 = cell->vertex(1)->info(),
-                        in2 = cell->vertex(2)->info(), in3 = cell->vertex(3)->info();
-
-            if(checkCellDeletion(cell))
-                continue;
-
-            Element element(*this);
-            element.m_nodesIndexes = {in0, in1, in2, in3};
-            element.computeJ();
-            element.computeDetJ();
-            element.computeInvJ();
-
-//            std::cout << in0 << ", " << in1 << ", " << in2 << ", " << in3 << ": " << m_nodesList.size() -1 << std::endl;
-//            std::cout << m_nodesList[in0].m_neighbourNodes.size() << ", " << m_nodesList[in0].m_neighbourNodes.capacity() << std::endl;
-            // We compute the neighbour nodes of each nodes
-            m_nodesList[in0].m_neighbourNodes.push_back(in1);
-            m_nodesList[in0].m_neighbourNodes.push_back(in2);
-            m_nodesList[in0].m_neighbourNodes.push_back(in3);
-
-            m_nodesList[in1].m_neighbourNodes.push_back(in0);
-            m_nodesList[in1].m_neighbourNodes.push_back(in2);
-            m_nodesList[in1].m_neighbourNodes.push_back(in3);
-
-            m_nodesList[in2].m_neighbourNodes.push_back(in0);
-            m_nodesList[in2].m_neighbourNodes.push_back(in1);
-            m_nodesList[in2].m_neighbourNodes.push_back(in3);
-
-            m_nodesList[in3].m_neighbourNodes.push_back(in0);
-            m_nodesList[in3].m_neighbourNodes.push_back(in1);
-            m_nodesList[in3].m_neighbourNodes.push_back(in2);
-
-            m_elementsList.push_back(std::move(element));
-
-            for(std::size_t index: m_elementsList.back().m_nodesIndexes)
-                m_nodesList[index].m_elements.push_back(m_elementsList.size() - 1);
+            std::vector<Alpha_shape_3::Cell_handle> inc_cells;
+            as.incident_cells(cell->vertex(i), std::back_inserter(inc_cells));
+            for(auto& cellHandle : inc_cells)
+            {
+                if(cellHandle->info().keep)
+                    neighborElements.insert(cellHandle->info().index);
+            }
         }
+
+        element.m_neighbourElements.resize(neighborElements.size());
+        std::copy(neighborElements.begin(), neighborElements.end(), element.m_neighbourElements.begin());
+
+        m_nodesList[in0].m_neighbourNodes.push_back(in1);
+        m_nodesList[in0].m_neighbourNodes.push_back(in2);
+        m_nodesList[in0].m_neighbourNodes.push_back(in3);
+
+        m_nodesList[in1].m_neighbourNodes.push_back(in0);
+        m_nodesList[in1].m_neighbourNodes.push_back(in2);
+        m_nodesList[in1].m_neighbourNodes.push_back(in3);
+
+        m_nodesList[in2].m_neighbourNodes.push_back(in0);
+        m_nodesList[in2].m_neighbourNodes.push_back(in1);
+        m_nodesList[in2].m_neighbourNodes.push_back(in3);
+
+        m_nodesList[in3].m_neighbourNodes.push_back(in0);
+        m_nodesList[in3].m_neighbourNodes.push_back(in1);
+        m_nodesList[in3].m_neighbourNodes.push_back(in2);
+
+        m_elementsList[elementIndex] = std::move(element);
+
+        for(std::size_t index : m_elementsList[elementIndex].m_nodesIndexes)
+            m_nodesList[index].m_elements.push_back(elementIndex);
     }
 
     #pragma omp parallel for default(shared)
@@ -162,7 +228,7 @@ void Mesh::triangulateAlphaShape3D()
                 cell = facetAS.first;
             }
 
-            if(checkCellDeletion(cell))
+            if(checkCellDeletion(cell)) //When we delete slivers, "hole" in the surface...
                 continue;
 
             Facet facet(*this);
@@ -202,9 +268,6 @@ void Mesh::triangulateAlphaShape3D()
         deleteFlyingNodes(false);
 
     computeFSNormalCurvature3D();
-
-    if(m_elementsList.empty())
-        throw std::runtime_error("Something went wrong while remeshing. You might have not chosen a good \"hchar\" with regard to your .msh file");
 }
 
 void Mesh::computeFSNormalCurvature3D()

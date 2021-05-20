@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-2, -1, 12, 100},
+		exclusionZones = {},
 		mshFile = "examples/2D/hydrostatic/geometry.msh"
 	},
 	
@@ -65,6 +66,7 @@ Problem = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, -9.81},
+			computePres = false,
 			BC = {
 
 			}

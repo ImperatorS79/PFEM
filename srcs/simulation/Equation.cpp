@@ -4,7 +4,6 @@
 
 #include "Problem.hpp"
 
-
 Equation::Equation(Problem* pProblem, Solver* pSolver, Mesh* pMesh,
                  std::vector<SolTable> solverParams, std::vector<SolTable> materialParams,
                  const std::vector<unsigned short>& bcFlags, const std::vector<unsigned int>& statesIndex,
@@ -17,20 +16,6 @@ m_pProblem(pProblem),
 m_pSolver(pSolver),
 m_pMesh(pMesh)
 {
-    unsigned int nGPHD = 0;
-    unsigned int nGPLD = 0;
-    if(m_pMesh->getDim() == 2)
-    {
-        nGPHD = 3;
-        nGPLD = 3;
-    }
-    else
-    {
-        nGPHD = 4;
-        nGPLD = 3;
-    }
-    m_pMatBuilder = std::make_unique<MatrixBuilder>(*pMesh, nGPHD, nGPLD);
-
     m_equationParams.resize(m_pProblem->getThreadCount());
     m_bcParams.resize(m_pProblem->getThreadCount());
     for(std::size_t i = 0 ; i < solverParams.size() ; ++i)
@@ -66,6 +51,11 @@ SolTable Equation::getBCParam(unsigned int thread) const
     return m_bcParams[thread];
 }
 
+double Equation::getDiffusionParam(const Node& /** node **/) const
+{
+    throw std::runtime_error("Unimplemented function by the child class -> Equation::getDiffusionParam()!");
+}
+
 std::string Equation::getID() const noexcept
 {
     return m_id;
@@ -76,9 +66,9 @@ bool Equation::isNormalCurvNeeded() const noexcept
     return m_needNormalCurv;
 }
 
-double Equation::getSpeedEquiv(double /** he **/, const Node& /** node **/)
+double Equation::getSquaredSpeedEquiv(const Node& /** node **/) const
 {
-    throw std::runtime_error("Unimplemented function by the child class -> Equation::getSpeedEquiv()!");
+    throw std::runtime_error("Unimplemented function by the child class -> Equation::getSquaredSpeedEquiv()!");
 }
 
 void Equation::preCompute()

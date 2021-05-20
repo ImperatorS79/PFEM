@@ -11,6 +11,7 @@ Problem = {
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-0.05, -0.05, 1.05, 1.05},
+		exclusionZones = {},
 		mshFile = "examples/2D/thermalConv/geometry.msh"
 	},
 	
@@ -54,6 +55,7 @@ Problem = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, -9.81},
+			computePres = false,
 			BC = {
 
 			}
