@@ -8,6 +8,7 @@
 
 #include "utility/Clock.hpp"
 #include "utility/SolTable.hpp"
+#include "meshSmoother/MeshSmoother.hpp"
 
 #include "simulation_defines.h"
 
@@ -76,6 +77,8 @@ class SIMULATION_API Solver
 
         std::map<std::string, double> m_accumalatedTimes;  /**< Accumulated time in each part of the solver*/
         Clock m_clock;
+
+        std::vector<std::unique_ptr<MeshSmoother>> m_pMeshSmoothers;
 
         double m_nextTimeToRemesh;
         void m_conditionalRemesh();

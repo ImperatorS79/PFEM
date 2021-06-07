@@ -5,6 +5,9 @@
 #include "../mesh/Mesh.hpp"
 #include "Problem.hpp"
 #include "Equation.hpp"
+#include "meshSmoother/PSmoother.hpp"
+#include "meshSmoother/GETMe.hpp"
+
 
 Solver::Solver(Problem* pProblem, Mesh* pMesh, std::vector<SolTable> m_problemParams):
 m_timeStep(0),
@@ -20,6 +23,41 @@ m_pProblem(pProblem)
     m_adaptDT = m_solverParams[0].checkAndGet<bool>("adaptDT");
     m_maxDT = m_solverParams[0].checkAndGet<double>("maxDT");
     m_initialDT = m_solverParams[0].checkAndGet<double>("initialDT");
+
+    if(m_solverParams[0].doesVarExist("MeshSmoother"))
+    {
+        SolTable meshSmoothers("MeshSmoother", m_solverParams[0]);
+        meshSmoothers.for_each([&](sol::object /*key*/, sol::object value){
+            SolTable smoother = SolTable(value);
+
+            std::string kind = smoother.checkAndGet<std::string>("kind");
+
+            if(kind == "PSmoother")
+            {
+                double a = smoother.checkAndGet<double>("a");
+                double epsADRTol = smoother.checkAndGet<double>("epsADRTol");
+                double beta = smoother.checkAndGet<double>("betaInit");
+
+                if(m_pMesh->getDim() == 2)
+                    m_pMeshSmoothers.push_back(std::make_unique<PSmoother<2>>(pProblem, *m_pMesh, 0, a, epsADRTol, beta));
+                else
+                    m_pMeshSmoothers.push_back(std::make_unique<PSmoother<3>>(pProblem, *m_pMesh, 0, a, epsADRTol, beta));
+            }
+            else if (kind == "GETMe")
+            {
+                double epsTol = smoother.checkAndGet<double>("epsTol");
+                double maxIter = smoother.checkAndGet<double>("maxIter");
+
+                if(m_pMesh->getDim() == 2)
+                    m_pMeshSmoothers.push_back(std::make_unique<GETMe<2>>(pProblem, *m_pMesh, 0, epsTol, maxIter));
+                else
+                    m_pMeshSmoothers.push_back(std::make_unique<GETMe<3>>(pProblem, *m_pMesh, 0, epsTol, maxIter));
+            }
+            else
+                throw std::runtime_error("unknown mesh smoother " + kind);
+
+        });
+    }
 
     m_nextTimeToRemesh = m_maxDT;
 }
