@@ -84,9 +84,14 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         return m_rho;
     });
 
-    m_pMatBuilder->setMGammacomputeFactor([&](const Facet& /** facet **/,
-                                              const NmatTypeLD<dim>& /** N **/) -> double {
-        return m_gamma;
+    m_pMatBuilder->setMGammacomputeFactor([&](const Facet& facet,
+                                              const NmatTypeLD<dim>& N) -> double {
+        Eigen::Matrix<double, dim, 1> curvatures;
+        for(unsigned short i = 0 ; i < dim ; ++i)
+        {
+            curvatures[i] = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(i));
+        }
+        return m_gamma*N*curvatures;
     });
 
     if(m_pProblem->getID() == "Bingham")

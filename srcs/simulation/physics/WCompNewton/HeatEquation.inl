@@ -45,7 +45,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         return m_k;
     });
 
-    m_needNormalCurv = false;
+    m_needNormalCurv = true;
 }
 
 template<unsigned short dim>
@@ -63,9 +63,9 @@ void HeatEqWCompNewton<dim>::displayParams() const
 }
 
 template<unsigned short dim>
-double HeatEqWCompNewton<dim>::getDiffusionParam(const Node& /** node **/) const
+double HeatEqWCompNewton<dim>::getDiffusionParam(const Node& node) const
 {
-    return m_k/m_cv;
+    return m_k/(m_cv*node.getState(m_statesIndex[1]));
 }
 
 template<unsigned short dim>

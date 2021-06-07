@@ -30,18 +30,18 @@ void MomContEqIncompNewton<dim>::m_buildAbPSPG(const Eigen::VectorXd& qPrev)
         double tau = m_computeTauPSPG(element);
         GradNmatType<dim> gradNe = m_pMatBuilder->getGradN(element);
         BmatType<dim> Be = m_pMatBuilder->getB(gradNe);
-        auto Me_dt_s = static_cast<Eigen::Matrix<double, nodPerEl, nodPerEl>>((1/dt)*m_pMatBuilder->getM(element));
-        auto Me_dt = MatrixBuilder<dim>::diagBlock(Me_dt_s);
-        auto Ke = m_pMatBuilder->getK(element, Be);
-        auto De = m_pMatBuilder->getD(element, Be);
-        auto Ce_dt = (tau/dt)*m_pMatBuilder->getC(element, Be, gradNe);
-        auto Le = tau*m_pMatBuilder->getL(element, Be, gradNe);
-        auto Fe = m_pMatBuilder->getF(element, m_bodyForce, Be);
-        auto He = tau*m_pMatBuilder->getH(element, m_bodyForce, Be, gradNe);
+        Eigen::Matrix<double, nodPerEl, nodPerEl> Me_dt_s = (1/dt)*m_pMatBuilder->getM(element);
+        Eigen::Matrix<double, dim*nodPerEl, dim*nodPerEl> Me_dt = MatrixBuilder<dim>::diagBlock(Me_dt_s);
+        Eigen::Matrix<double, dim*nodPerEl, dim*nodPerEl> Ke = m_pMatBuilder->getK(element, Be);
+        Eigen::Matrix<double, nodPerEl, dim*nodPerEl> De = m_pMatBuilder->getD(element, Be);
+        Eigen::Matrix<double, nodPerEl, dim*nodPerEl> Ce_dt = (tau/dt)*m_pMatBuilder->getC(element, Be, gradNe);
+        Eigen::Matrix<double, nodPerEl, nodPerEl> Le = tau*m_pMatBuilder->getL(element, Be, gradNe);
+        Eigen::Matrix<double, dim*nodPerEl, 1> Fe = m_pMatBuilder->getF(element, m_bodyForce, Be);
+        Eigen::Matrix<double, nodPerEl, 1> He = tau*m_pMatBuilder->getH(element, m_bodyForce, Be, gradNe);
 
         Ae << Me_dt + Ke, -De.transpose(), Ce_dt + De, Le;
 
-        auto vPrev = getElementVecState<dim>(qPrev, element, 0, nNodes);
+        Eigen::Matrix<double, dim*nodPerEl, 1> vPrev = getElementVecState<dim>(qPrev, element, 0, nNodes);
 
         be << Fe + Me_dt*vPrev, He + Ce_dt*vPrev;
 
@@ -165,17 +165,16 @@ void MomContEqIncompNewton<dim>::m_applyBCPSPG(const Eigen::VectorXd& qPrev)
         auto MGamma_s = m_pMatBuilder->getMGamma(facet);
         auto MGamma = MatrixBuilder<dim>::diagBlock(MGamma_s);
 
-        Eigen::Matrix<double, dim*noPerFacet, 1> kappa_n;
+        Eigen::Matrix<double, dim*noPerFacet, 1> nVec;
         for(uint8_t n = 0 ; n < noPerFacet; ++n)
         {
-            double curvature = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(n));
             std::array<double, 3> normal = m_pMesh->getBoundFSNormal(facet.getNodeIndex(n));
 
             for(uint8_t d = 0 ; d < dim ; ++d)
-                kappa_n(n + d*noPerFacet) = curvature*normal[d];
+                nVec(n + d*noPerFacet) = normal[d];
         }
 
-        Eigen::Matrix<double, dim*noPerFacet, 1> Ff = MGamma*kappa_n;
+        Eigen::Matrix<double, dim*noPerFacet, 1> Ff = MGamma*nVec;
 
         for(unsigned short i = 0 ; i < noPerFacet ; ++i)
         {

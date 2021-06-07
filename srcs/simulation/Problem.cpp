@@ -141,7 +141,7 @@ std::vector<double> Problem::getMeshWrittableData(const std::string& name, std::
         if(!m_pMesh->isNormalCurvComputed())
             return {0, 0, 0};
 
-        if(m_pMesh->getNode(nodeIndex).isOnFreeSurface() || m_pMesh->getNode(nodeIndex).isBound())
+        if(m_pMesh->getNode(nodeIndex).isOnFreeSurface() || (m_pMesh->getNode(nodeIndex).isBound() && !m_pMesh->getNode(nodeIndex).isFree()))
         {
             std::array<double, 3> normal = m_pMesh->getBoundFSNormal(nodeIndex);
             return {normal[0], normal[1], normal[2]};

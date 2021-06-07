@@ -102,7 +102,7 @@ void MomContEqIncompNewton<dim>::m_buildMatFracStep(const std::vector<Eigen::Vec
                 /********************************************************************
                                             Build L
                 ********************************************************************/
-                if(!ni.isFree() && !ni.isOnFreeSurface() && !(element.getNodeIndex(i) == 800))
+                if(!ni.isFree() && !ni.isOnFreeSurface())
                 {
                     indexL[tripletPerElmDtL*elm + countL] =
                         Eigen::Triplet<double>(element.getNodeIndex(i),
@@ -142,7 +142,7 @@ void MomContEqIncompNewton<dim>::m_buildMatFracStep(const std::vector<Eigen::Vec
     {
         const Node& node = m_pMesh->getNode(n);
 
-        if(node.isFree() || node.isOnFreeSurface() || n == 800)
+        if(node.isFree() || node.isOnFreeSurface())
         {
             indexL.push_back(Eigen::Triplet<double>(n, n, 1));
         }
@@ -210,17 +210,16 @@ void MomContEqIncompNewton<dim>::m_applyBCVAppStep(const Eigen::VectorXd& qPrev)
         auto MGamma_s = m_pMatBuilder->getMGamma(facet);
         auto MGamma = MatrixBuilder<dim>::diagBlock(MGamma_s);
 
-        Eigen::Matrix<double, dim*noPerFacet, 1> kappa_n;
+        Eigen::Matrix<double, dim*noPerFacet, 1> nVec;
         for(uint8_t n = 0 ; n < noPerFacet; ++n)
         {
-            double curvature = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(n));
             std::array<double, 3> normal = m_pMesh->getBoundFSNormal(facet.getNodeIndex(n));
 
             for(uint8_t d = 0 ; d < dim ; ++d)
-                kappa_n(n + d*noPerFacet) = curvature*normal[d];
+                nVec(n + d*noPerFacet) = normal[d];
         }
 
-        Eigen::Matrix<double, dim*noPerFacet, 1> Ff = MGamma*kappa_n;
+        Eigen::Matrix<double, dim*noPerFacet, 1> Ff = MGamma*nVec;
 
         for(unsigned short i = 0 ; i < noPerFacet ; ++i)
         {
@@ -343,7 +342,7 @@ void MomContEqIncompNewton<dim>::m_applyBCPCorrStep()
     for (std::size_t n = 0 ; n < nodesCount ; ++n)
     {
         const Node& node = m_pMesh->getNode(n);
-        if(node.isFree() || node.isOnFreeSurface() || n == 800)
+        if(node.isFree() || node.isOnFreeSurface())
         {
             m_bPcorrStep[n] = 0;
 

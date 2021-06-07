@@ -73,6 +73,16 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         return (N*getElementState<dim>(element, m_statesIndex[3])).value();
     });
 
+    m_pMatBuilder->setMGammacomputeFactor([&](const Facet& facet,
+                                              const NmatTypeLD<dim>& N) -> double {
+        Eigen::Matrix<double, dim, 1> curvatures;
+        for(unsigned short i = 0 ; i < dim ; ++i)
+        {
+            curvatures[i] = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(i));
+        }
+        return m_gamma*N*curvatures;
+    });
+
     m_pMatBuilder->setKcomputeFactor([&](const Element& /** element **/,
                                          const NmatTypeHD<dim>& /** N **/,
                                          const BmatType<dim>& /** B **/,
@@ -111,7 +121,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
 
     m_bodyForce = Eigen::Map<Eigen::Matrix<double, dim, 1>>(bodyForce.data(), bodyForce.size());
 
-    m_needNormalCurv = (m_gamma < 1e-15) ? false : true;
+    m_needNormalCurv = true;//(m_gamma < 1e-15) ? false : true;
 }
 
 template<unsigned short dim>
@@ -252,6 +262,48 @@ void MomEqWCompNewton<dim>::m_applyBC()
     assert(m_pMesh->getNodesCount() != 0);
 
     const std::size_t nodesCount = m_pMesh->getNodesCount();
+    const std::size_t facetsCount = m_pMesh->getFacetsCount();
+    constexpr unsigned short noPerFacet = dim;
+
+    for(std::size_t f = 0 ; f < facetsCount ; ++f)
+    {
+        if(m_gamma < 1e-15)
+            continue;
+
+        const Facet& facet = m_pMesh->getFacet(f);
+
+        bool onFS = true;
+        for(unsigned short n = 0 ; n < noPerFacet ; ++n)
+        {
+            if(!facet.getNode(n).isOnFreeSurface())
+            {
+                onFS = false;
+                break;
+            }
+        }
+        if(!onFS)
+            continue;
+
+        auto MGamma_s = m_pMatBuilder->getMGamma(facet);
+        auto MGamma = MatrixBuilder<dim>::diagBlock(MGamma_s);
+
+        Eigen::Matrix<double, dim*noPerFacet, 1> nVec;
+        for(uint8_t n = 0 ; n < noPerFacet; ++n)
+        {
+            std::array<double, 3> normal = m_pMesh->getBoundFSNormal(facet.getNodeIndex(n));
+
+            for(uint8_t d = 0 ; d < dim ; ++d)
+                nVec(n + d*noPerFacet) = normal[d];
+        }
+
+        Eigen::Matrix<double, dim*noPerFacet, 1> Ff = MGamma*nVec;
+
+        for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+        {
+            for(unsigned short d = 0 ; d < dim ; ++d)
+                m_F(facet.getNodeIndex(i) + d*nodesCount) += Ff[d*noPerFacet + i];
+        }
+    }
 
     auto& invMDiag = m_invM.diagonal();
 
