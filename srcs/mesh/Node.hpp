@@ -47,11 +47,19 @@ class MESH_API Node
         inline bool getFlag(unsigned short flag) const noexcept;
 
         /// \param elementIndex The index of the node's element.
+        /// \return The index of the element in the mesh.
+        inline std::size_t getElementMeshIndex(unsigned int elementIndex) const noexcept;
+
+        /// \param elementIndex The index of the node's element.
         /// \return A constant reference to the element.
         const Element& getElement(unsigned int elementIndex) const noexcept;
 
         /// \return The number of elements the node is inside.
         inline unsigned int getElementCount() const noexcept;
+
+        /// \param facetIndex The index of the node's facet.
+        /// \return The index of the facet in the mesh.
+        inline std::size_t getFacetMeshIndex(unsigned int facetIndex) const noexcept;
 
         /// \param facetIndex The index of the node's facet.
         /// \return A constant reference to the facet.

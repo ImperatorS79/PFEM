@@ -30,9 +30,19 @@ inline unsigned int Node::getElementCount() const noexcept
     return m_elements.size();
 }
 
+inline std::size_t Node::getElementMeshIndex(unsigned int elementIndex) const noexcept
+{
+    return m_elements[elementIndex];
+}
+
 inline unsigned int Node::getFacetCount() const noexcept
 {
     return m_facets.size();
+}
+
+inline std::size_t Node::getFacetMeshIndex(unsigned int facetIndex) const noexcept
+{
+    return m_facets[facetIndex];
 }
 
 inline bool Node::isFree() const noexcept

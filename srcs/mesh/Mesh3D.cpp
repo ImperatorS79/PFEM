@@ -14,7 +14,7 @@
 struct CellInfo
 {
     bool keep = false;
-    std::size_t index;
+    std::size_t index = std::numeric_limits<std::size_t>::max();
 };
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel                     Kernel;
@@ -63,12 +63,6 @@ void Mesh::triangulateAlphaShape3D()
         if(in0 == in2 || in0 == in1 || in0 == in3 || in1 == in2 || in1 == in3 || in2 == in3)
             return true;
 
-        Tetrahedron_3 tetrahedron(pointsList[in0].first, pointsList[in1].first,
-                                  pointsList[in2].first, pointsList[in3].first);
-
-        if(tetrahedron.volume() < 0.02*m_hchar*m_hchar*m_hchar)
-            return true;
-
         double meanX = (m_nodesList[in0].getCoordinate(0) + m_nodesList[in1].getCoordinate(0)
                         + m_nodesList[in2].getCoordinate(0) + m_nodesList[in3].getCoordinate(0))/4;
 
@@ -88,6 +82,12 @@ void Mesh::triangulateAlphaShape3D()
         if(m_nodesList[in0].isBound() && m_nodesList[in1].isBound() &&
            m_nodesList[in2].isBound() && m_nodesList[in3].isBound())
         {
+            Tetrahedron_3 tetrahedron(pointsList[in0].first, pointsList[in1].first,
+                                  pointsList[in2].first, pointsList[in3].first);
+
+            if(tetrahedron.volume() < 0.02*m_hchar*m_hchar*m_hchar)
+                return true;
+
             for(unsigned int i = 0 ; i < 4 ; ++i)
             {
                 std::set<Alpha_shape_3::Vertex_handle> neighbourVh;
@@ -131,6 +131,10 @@ void Mesh::triangulateAlphaShape3D()
             continue;
 
         const Alpha_shape_3::Cell_handle cell{cit};
+
+        if(as.is_infinite(cell))
+            continue;
+
         if(checkCellDeletion(cell))
             continue;
 
@@ -171,7 +175,10 @@ void Mesh::triangulateAlphaShape3D()
             as.incident_cells(cell->vertex(i), std::back_inserter(inc_cells));
             for(auto& cellHandle : inc_cells)
             {
-                if(cellHandle->info().keep)
+                if(as.is_infinite(cellHandle))
+                    continue;
+
+                if(cellHandle->info().keep && (cellHandle->info().index != elementIndex))
                     neighborElements.insert(cellHandle->info().index);
             }
         }

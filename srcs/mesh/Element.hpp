@@ -29,6 +29,9 @@ class MESH_API Element
         /// \return A constant reference to the element.
         const Element& getNeighbourElement(unsigned int neighbourElmIndex) const noexcept;
 
+        /// \return The number of elements that are next to this element.
+        inline std::size_t getNeighbourElementsCount() const noexcept;
+
         /// \param neighbourElmIndex The index of the neighbour element inside the element.
         /// \return The index of the element inside the mesh.
         inline std::size_t getNeighbourElmIndex(unsigned int neighbourElmIndex) const noexcept;

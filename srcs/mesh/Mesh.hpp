@@ -193,6 +193,7 @@ class MESH_API Mesh
          */
         void updateNodesPosition(const std::vector<double>& deltaPos);
         void updateNodesPosition(const Eigen::VectorXd& deltaPos);
+        void updateNodesPosition(const Eigen::VectorXd& deltaPos, const std::vector<std::size_t> nodesIndexes);
 
         /**
          * \brief Update the nodes position (from the saved nodeS List).
@@ -200,6 +201,7 @@ class MESH_API Mesh
          */
         void updateNodesPositionFromSave(const std::vector<double>& deltaPos);
         void updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos);
+        void updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos, const std::vector<std::size_t> nodesIndexes);
 
     private:
         double m_hchar; /**< Characteristic size of an element (same as in .geo file). */

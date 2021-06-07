@@ -65,7 +65,7 @@ inline std::array<double, 3> Mesh::getBoundFSNormal(std::size_t nodeIndex) const
     auto it = m_boundFSNormal.find(nodeIndex);
 
     if(it == m_boundFSNormal.end())
-        throw std::runtime_error("normal is only available for free surface nodes!");
+        throw std::runtime_error("node index " + std::to_string(nodeIndex) + ": normal is only available for free surface and boundary nodes!");
     else
         return it->second;
 }
@@ -75,7 +75,7 @@ inline double Mesh::getFreeSurfaceCurvature(std::size_t nodeIndex) const
     auto it = m_freeSurfaceCurvature.find(nodeIndex);
 
     if(it == m_freeSurfaceCurvature.end())
-        throw std::runtime_error("curvature is only available for free surface nodes!");
+        throw std::runtime_error("node index " + std::to_string(nodeIndex) + ": curvature is only available for free surface nodes!");
     else
         return it->second;
 }

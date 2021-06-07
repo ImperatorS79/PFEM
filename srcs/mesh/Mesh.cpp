@@ -4,6 +4,7 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <set>
 
 #include <gmsh.h>
 
@@ -32,11 +33,11 @@ bool Mesh::addNodes(bool verboseOutput)
 
     double limitSize =  m_omega*std::pow(m_hchar, m_dim);
 
-    std::size_t elementCount = m_elementsList.size(); //avoid problems because the follwinĝ for loop will increase the element number
+    std::size_t elementCount = m_elementsList.size(); //avoid problems because the follwing for loop will increase the element number
 
     for(std::size_t elm = 0 ; elm < elementCount ; ++elm)
     {
-        //If an element is too big, we add a node at his center
+        //If an element is too big, we add a node at his centre
         if(m_elementsList[elm].getSize() > limitSize && (m_addOnFS ? true : !m_elementsList[elm].isOnFS()))
         {
             Node newNode(*this);
@@ -1121,11 +1122,68 @@ void Mesh::updateNodesPosition(const Eigen::VectorXd& deltaPos)
     computeFSNormalCurvature();
 }
 
+void Mesh::updateNodesPosition(const Eigen::VectorXd& deltaPos,
+                               const std::vector<std::size_t> nodesIndexes)
+{
+    if(static_cast<std::size_t>(deltaPos.rows()/m_dim) != nodesIndexes.size())
+        throw std::runtime_error("size of deltaPos and nodesIndexes vector must be dim*x and x!");
+
+    std::set<std::size_t> elementModified;
+    std::set<std::size_t> facetModified;
+    for(std::size_t n : nodesIndexes)
+    {
+        const Node& node = m_nodesList[n];
+        for(unsigned int e = 0 ; e < node.getElementCount() ; ++e)
+        {
+            elementModified.insert(node.getElementMeshIndex(e));
+
+        }
+
+        for(unsigned int f = 0 ; f < node.getFacetCount() ; ++f)
+        {
+            facetModified.insert(node.getFacetMeshIndex(f));
+
+        }
+    }
+
+    #pragma omp parallel for default(shared)
+    for(auto i = 0 ; i < deltaPos.rows()/m_dim ; ++i)
+    {
+        std::size_t n = nodesIndexes[i];
+
+        if(!m_nodesList[n].m_isFixed)
+        {
+            for(unsigned short d = 0 ; d < m_dim ; ++d)
+            {
+                m_nodesList[n].m_position[d] += deltaPos[i + d*nodesIndexes.size()];
+            }
+        }
+    }
+
+    for(auto it = elementModified.begin() ; it != elementModified.end() ; ++it)
+    {
+        m_elementsList[*it].computeJ();
+        m_elementsList[*it].computeDetJ();
+        m_elementsList[*it].computeInvJ();
+    }
+
+    for(auto it = facetModified.begin() ; it != facetModified.end() ; ++it)
+    {
+        m_facetsList[*it].computeJ();
+        m_facetsList[*it].computeDetJ();
+        m_facetsList[*it].computeInvJ();
+    }
+
+    //To do: only update normal of facet that have been updated
+    computeFSNormalCurvature();
+}
+
 void Mesh::updateNodesPositionFromSave(const std::vector<double>& deltaPos)
 {
     if(m_nodesListSave.empty())
         throw std::runtime_error("you did not save the nodes list!");
-    else if(deltaPos.size() != m_nodesListSave.size()*m_dim)
+
+    if(deltaPos.size() != m_nodesListSave.size()*m_dim)
         throw std::runtime_error("invalid size of the deltaPos vector: " + std::to_string(deltaPos.size()) + " VS " + std::to_string(m_nodesListSave.size()*m_dim));
 
     #pragma omp parallel for default(shared)
@@ -1163,7 +1221,8 @@ void Mesh::updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos)
 {
     if(m_nodesListSave.empty())
         throw std::runtime_error("you did not save the nodes list!");
-    else if(static_cast<std::size_t>(deltaPos.rows()) < m_nodesListSave.size()*m_dim)
+
+    if(static_cast<std::size_t>(deltaPos.rows()) < m_nodesListSave.size()*m_dim)
         throw std::runtime_error("invalid size of the deltaPos vector: " + std::to_string(deltaPos.rows()) + " VS " + std::to_string(m_nodesListSave.size()*m_dim));
 
     #pragma omp parallel for default(shared)
@@ -1194,5 +1253,64 @@ void Mesh::updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos)
         m_facetsList[facet].computeInvJ();
     }
 
+    computeFSNormalCurvature();
+}
+
+void Mesh::updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos,
+                                       const std::vector<std::size_t> nodesIndexes)
+{
+    if(m_nodesListSave.empty())
+        throw std::runtime_error("you did not save the nodes list!");
+
+    if(static_cast<std::size_t>(deltaPos.rows()/m_dim) != nodesIndexes.size())
+        throw std::runtime_error("size of deltaPos and nodesIndexes vector must be dim*x and x!");
+
+    std::set<std::size_t> elementModified;
+    std::set<std::size_t> facetModified;
+    for(std::size_t n : nodesIndexes)
+    {
+        const Node& node = m_nodesList[n];
+        for(unsigned int e = 0 ; e < node.getElementCount() ; ++e)
+        {
+            elementModified.insert(node.getElementMeshIndex(e));
+
+        }
+
+        for(unsigned int f = 0 ; f < node.getFacetCount() ; ++f)
+        {
+            facetModified.insert(node.getFacetMeshIndex(f));
+
+        }
+    }
+
+    #pragma omp parallel for default(shared)
+    for(auto i = 0 ; i < deltaPos.rows()/m_dim ; ++i)
+    {
+        std::size_t n = nodesIndexes[i];
+
+        if(!m_nodesList[n].m_isFixed)
+        {
+            for(unsigned short d = 0 ; d < m_dim ; ++d)
+            {
+                m_nodesList[n].m_position[d] = m_nodesListSave[n].m_position[d] + deltaPos[i + d*nodesIndexes.size()];
+            }
+        }
+    }
+
+    for(auto it = elementModified.begin() ; it != elementModified.end() ; ++it)
+    {
+        m_elementsList[*it].computeJ();
+        m_elementsList[*it].computeDetJ();
+        m_elementsList[*it].computeInvJ();
+    }
+
+    for(auto it = facetModified.begin() ; it != facetModified.end() ; ++it)
+    {
+        m_facetsList[*it].computeJ();
+        m_facetsList[*it].computeDetJ();
+        m_facetsList[*it].computeInvJ();
+    }
+
+    //To do: only update normal of facet that have been updated
     computeFSNormalCurvature();
 }
