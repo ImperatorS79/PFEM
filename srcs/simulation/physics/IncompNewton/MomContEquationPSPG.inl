@@ -208,6 +208,7 @@ void MomContEqIncompNewton<dim>::m_applyBCPSPG(const Eigen::VectorXd& qPrev)
                 result = m_bcParams[0].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",
                                                         node.getPosition(),
                                                         m_pMesh->getBoundNodeInitPos(n),
+                                                        node.getStates(),
                                                         m_pProblem->getCurrentSimTime() +
                                                         m_pSolver->getTimeStep());
 

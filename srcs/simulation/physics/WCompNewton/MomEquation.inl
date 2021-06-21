@@ -121,7 +121,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
 
     m_bodyForce = Eigen::Map<Eigen::Matrix<double, dim, 1>>(bodyForce.data(), bodyForce.size());
 
-    m_needNormalCurv = true;//(m_gamma < 1e-15) ? false : true;
+    m_needNormalCurv = (m_gamma < 1e-15) ? false : true;
 }
 
 template<unsigned short dim>
@@ -324,12 +324,14 @@ void MomEqWCompNewton<dim>::m_applyBC()
         }
         else if(node.isBound())
         {
+
             if(node.getFlag(m_bcFlags[0]))
             {
                 std::array<double, dim> result;
                 result = m_bcParams[threadIndex].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",
                                                         node.getPosition(),
                                                         m_pMesh->getBoundNodeInitPos(n),
+                                                        node.getStates(),
                                                         m_pProblem->getCurrentSimTime() +
                                                         m_pSolver->getTimeStep());
 

@@ -252,6 +252,7 @@ void MomContEqIncompNewton<dim>::m_applyBCVAppStep(const Eigen::VectorXd& qPrev)
                 result = m_bcParams[0].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",
                                                         node.getPosition(),
                                                         m_pMesh->getBoundNodeInitPos(n),
+                                                        node.getStates(),
                                                         m_pProblem->getCurrentSimTime() +
                                                         m_pSolver->getTimeStep());
 
@@ -602,8 +603,6 @@ void MomContEqIncompNewton<dim>::m_setupPicardFracStep(unsigned int maxIter, dou
             else
                 resP = std::sqrt(num/den);
         }
-
-        std::cout << "\t * Residual: v -> " << resV << ", p -> " << resP << std::endl;
 
         m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
 
