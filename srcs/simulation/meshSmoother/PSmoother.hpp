@@ -11,7 +11,7 @@ template<unsigned short dim>
 class PSmoother : public MeshSmoother
 {
     public:
-        PSmoother(Problem* pProblem, Mesh& mesh, double timeBetweenSmooth, double a, double epsADRtoll, double betaInit);
+        PSmoother(Problem* pProblem, Mesh& mesh, double a, double epsADRtoll, double betaInit);
         ~PSmoother() override;
 
         void smooth(bool verboseOuput) override;

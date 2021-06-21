@@ -8,7 +8,7 @@ template<unsigned short dim>
 class GETMe: public MeshSmoother
 {
     public:
-        GETMe(Problem* pProblem, Mesh& mesh, double timeBetweenSmooth, unsigned int maxIter, double epsToll);
+        GETMe(Problem* pProblem, Mesh& mesh, unsigned int maxIter, double epsToll);
         ~GETMe() override;
 
         void smooth(bool verboseOuput) override;

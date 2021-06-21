@@ -4,8 +4,8 @@
 #include <vector>
 
 template<unsigned short dim>
-PSmoother<dim>::PSmoother(Problem* pProblem, Mesh& mesh, double timeBetweenSmooth, double a, double epsADRtoll, double betaInit):
-MeshSmoother(pProblem, mesh, timeBetweenSmooth),
+PSmoother<dim>::PSmoother(Problem* pProblem, Mesh& mesh, double a, double epsADRtoll, double betaInit):
+MeshSmoother(pProblem, mesh),
 m_a(a),
 m_epsADRtoll(epsADRtoll),
 m_beta(betaInit)

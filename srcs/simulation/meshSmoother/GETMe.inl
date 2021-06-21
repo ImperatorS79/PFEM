@@ -1,8 +1,8 @@
 #include "GETMe.hpp"
 
 template<unsigned short dim>
-GETMe<dim>::GETMe(Problem* pProblem, Mesh& mesh, double timeBetweenSmooth, unsigned int maxIter, double epsToll) :
-MeshSmoother(pProblem, mesh, timeBetweenSmooth),
+GETMe<dim>::GETMe(Problem* pProblem, Mesh& mesh, unsigned int maxIter, double epsToll) :
+MeshSmoother(pProblem, mesh),
 m_maxIter(maxIter),
 m_epsToll(epsToll)
 {
@@ -123,37 +123,13 @@ void GETMe<dim>::smooth(bool verboseOutput)
     {
         std::size_t elmToSmooth = 0;
         double minRin = std::numeric_limits<double>::max();
-        bool foundOne = false;
         for(std::size_t elm = 0 ; elm < nElm ; ++elm)
         {
-            const Element& element = m_mesh.getElement(elm);
-
-            bool keep = false;
-            for(unsigned short n = 0 ; n < dim + 1 ; ++n)
-            {
-                if(!element.getNode(n).isBound())
-                {
-                    keep = true;
-                    foundOne = true;
-                    break;
-                }
-            }
-
-            if(!keep)
-                continue;
-
             if(m_rins[elm] < minRin)
             {
                 minRin = m_rins[elm];
                 elmToSmooth = elm;
             }
-        }
-
-        if(!foundOne)
-        {
-            if(verboseOutput)
-                std::cout << "No element found to smooth" << std::endl;
-            return;
         }
 
         if(verboseOutput)
@@ -197,7 +173,6 @@ void GETMe<dim>::smooth(bool verboseOutput)
         double innerCounter = 0;
         while(!updateSuccessFull)
         {
-            std::cout << "sigma: " << fact*sigmaE << std::endl;
             for(unsigned short n = 0 ; n < dim + 1 ; ++n)
             {
                 const Node& node = elementToSmooth.getNode(n);
@@ -222,61 +197,51 @@ void GETMe<dim>::smooth(bool verboseOutput)
                 nodeIndexProbToMesh[n] = elementToSmooth.getNodeIndex(n);
             }
 
-            m_mesh.updateNodesPosition(deltaPos, nodeIndexProbToMesh);
-
-            newRin = elementToSmooth.getRin();
-
-            updateSuccessFull = true;
-
-            std::vector<double> newRins(elementToSmooth.getNeighbourElementsCount());
-            for(std::size_t elm = 0 ; elm < elementToSmooth.getNeighbourElementsCount() ; ++elm)
+            if(newRin > 0)
             {
-                const Element& element = m_mesh.getElement(elementToSmooth.getNeighbourElmIndex(elm));
-                std::size_t elmIndex = elementToSmooth.getNeighbourElmIndex(elm);
-                double rin = element.getRin();
+                m_mesh.updateNodesPosition(deltaPos, nodeIndexProbToMesh);
+                updateSuccessFull = true;
 
-                std::cout << elmIndex << ": " << rin << std::endl;
+                newRin = elementToSmooth.getRin();
 
-                bool keep = false;
-                for(unsigned short n = 0 ; n < dim + 1 ; ++n)
+                std::vector<double> newRins(elementToSmooth.getNeighbourElementsCount());
+                for(std::size_t elm = 0 ; elm < elementToSmooth.getNeighbourElementsCount() ; ++elm)
                 {
-                    if(!element.getNode(n).isBound())
+                    const Element& element = elementToSmooth.getNeighbourElement(elm);
+                    double rin = element.getRin();
+
+                    if(rin > minRin)
+                        newRins[elm] = rin;
+                    else
                     {
-                        keep = true;
+                        updateSuccessFull = false;
                         break;
                     }
                 }
 
-                if(!keep)
-                    continue;
+                if(!updateSuccessFull)
+                {
+                    m_mesh.updateNodesPosition(-deltaPos, nodeIndexProbToMesh);
+                    fact *= 0.75;
 
-                if(rin > minRin)
-                    newRins[elm] = rin;
+                    if(verboseOutput)
+                        std::cout << "GETMe produced inverted elements or smaller rin, decreasing sigma" << std::endl;
+                }
                 else
                 {
-                    updateSuccessFull = false;
-                    break;
+                    m_rins[elmToSmooth] = newRin;
+                    for(std::size_t elm = 0 ; elm < elementToSmooth.getNeighbourElementsCount() ; ++elm)
+                    {
+                        std::size_t elmIndex = elementToSmooth.getNeighbourElmIndex(elm);
+
+                        m_rins[elmIndex] = newRins[elm];
+                    }
                 }
-            }
-
-            if(!updateSuccessFull)
-            {
-                m_mesh.updateNodesPosition(-deltaPos, nodeIndexProbToMesh);
-                fact *= 0.75;
-
-                if(verboseOutput)
-                    std::cout << "GETMe produced inverted elements or smaller rin, decreasing sigma" << std::endl;
             }
             else
             {
-                m_rins[elmToSmooth] = newRin;
-                for(std::size_t elm = 0 ; elm < elementToSmooth.getNeighbourElementsCount() ; ++elm)
-                {
-                    const Element& element = m_mesh.getElement(elementToSmooth.getNeighbourElmIndex(elm));
-                    std::size_t elmIndex = element.getNeighbourElmIndex(elm);
-
-                    m_rins[elmIndex] = newRins[elm];
-                }
+                if(verboseOutput)
+                        std::cout << "GETMe produced inverted elements or smaller rin, decreasing sigma" << std::endl;
             }
 
             innerCounter++;
@@ -289,9 +254,6 @@ void GETMe<dim>::smooth(bool verboseOutput)
                 return;
             }
         }
-
-        if(newRin < 0)
-            std::cerr << "dude, wtf ?" << std::endl;
 
         if(counter == 0)
             res = std::numeric_limits<double>::max();

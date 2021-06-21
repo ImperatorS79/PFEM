@@ -7,10 +7,9 @@
 class MeshSmoother
 {
     public:
-        MeshSmoother(Problem* pProblem, Mesh& mesh, double timeBetweenSmooth):
+        MeshSmoother(Problem* pProblem, Mesh& mesh):
         m_pProblem(pProblem),
-        m_mesh(mesh),
-        m_timeBetweenSmooth(timeBetweenSmooth)
+        m_mesh(mesh)
         {
 
         }
@@ -28,10 +27,6 @@ class MeshSmoother
     protected:
         Problem* m_pProblem;
         Mesh& m_mesh;
-
-        double m_nextTimeTrigger;
-        double m_timeBetweenSmooth;
-
 };
 
 #endif // MESHSMOOTHER_HPP_INCLUDED
