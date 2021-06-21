@@ -137,6 +137,11 @@ const Node& Facet::getOutNode() const noexcept
     return m_pMesh->getNode(m_outNodeIndex);
 }
 
+const Element& Facet::getElement() const noexcept
+{
+    return m_pMesh->getElement(m_elementIndex);
+}
+
 std::array<double, 3> Facet::getPosFromGP(const std::array<double, 3>& gp) const noexcept
 {
     const Node& n0 = m_pMesh->getNode(m_nodesIndexes[0]);

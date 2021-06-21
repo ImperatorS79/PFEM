@@ -31,9 +31,9 @@ bool Mesh::addNodes(bool verboseOutput)
 
     std::vector<bool> toBeDeleted(m_elementsList.size(), false);
 
-    double limitSize =  m_omega*std::pow(m_hchar, m_dim);
-
     std::size_t elementCount = m_elementsList.size(); //avoid problems because the follwing for loop will increase the element number
+
+    double limitSize =  m_omega*std::pow(m_hchar, m_dim);
 
     for(std::size_t elm = 0 ; elm < elementCount ; ++elm)
     {
@@ -800,7 +800,7 @@ void Mesh::loadFromFile(const std::string& fileName)
     {
         std::string name;
         gmsh::model::getPhysicalName(m_dim - 1, physGroupLD.second, name);
-        if(name != "FreeSurface")
+        if(name != "FreeSurface" && name != "Fluid")
         {
             std::vector<double> coord;
             std::vector<std::size_t> dummyNodesTagsBoundary;
@@ -929,9 +929,9 @@ bool Mesh::removeNodes(bool verboseOutput) noexcept
     std::vector<bool> touched(m_nodesList.size(), false);       //Is the node next to a node which should be deleted
     std::vector<bool> toBeDeleted(m_nodesList.size(), false);   //Should the node be deleted
 
-    bool removeNodes = false;
-
     double limitLength = m_gamma*m_hchar;
+
+    bool removeNodes = false;
 
     for(std::size_t i = 0 ; i < m_nodesList.size() ; ++i)
     {

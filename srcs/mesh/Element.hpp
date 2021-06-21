@@ -93,6 +93,9 @@ class MESH_API Element
         /// \return The position in real space.
         std::array<double, 3> getPosFromGP(const std::array<double, 3>& gp) const noexcept;
 
+        /// \return The minimum distance between 2 nodes of the element.
+        double getMinNodeDist() const noexcept;
+
         /// \return The element incircle/insphere.
         double getRin() const noexcept;
 

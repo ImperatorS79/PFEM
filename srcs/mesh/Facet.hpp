@@ -10,6 +10,7 @@
 
 class Mesh;
 class Node;
+class Element;
 
 /**
  * \class Facet
@@ -24,6 +25,9 @@ class MESH_API Facet
         Facet(Facet&& facet)           = default;
         ~Facet()                       = default;
 
+        /// \return The index of the element attache to the facet, in the mesh
+        inline std::size_t getElementIndex() const noexcept;
+
         /// \param nodeFacetIndex The index of the node in the facet.
         /// \return The index of the facet's node in the mesh.
         inline std::size_t getNodeIndex(unsigned int nodeFacetIndex) const noexcept;
@@ -37,6 +41,9 @@ class MESH_API Facet
 
         /// \return A constant reference to the facet's opposite node.
         const Node& getOutNode() const noexcept;
+
+        /// \return A constant reference to the facet's opposite node.
+        const Element& getElement() const noexcept;
 
         /// \param stateIndex The index of the state.
         /// \return A vector containing the considered state for each node of the facet.
@@ -95,6 +102,7 @@ class MESH_API Facet
 
         std::vector<std::size_t> m_nodesIndexes;        /**< Indexes of the nodes in the nodes list which compose this facet. */
         std::size_t m_outNodeIndex;                     /**< Indexes of the node which is "in front of" this facet. */
+        std::size_t m_elementIndex;
 
         double m_detJ;                                  /**< Determinant of the Jacobian matrix of the facet. */
         std::array<std::array<double, 2>, 3> m_J;       /**< Jacobian matrix of the facet. */

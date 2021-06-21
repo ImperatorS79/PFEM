@@ -4,6 +4,7 @@
 #include <CGAL/Triangulation_face_base_with_info_2.h>
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <CGAL/Delaunay_triangulation_2.h>
+#include <CGAL/Regular_triangulation_2.h>
 #include <CGAL/Alpha_shape_2.h>
 #include <CGAL/Alpha_shape_vertex_base_2.h>
 #include <CGAL/Alpha_shape_face_base_2.h>
@@ -222,6 +223,7 @@ void Mesh::triangulateAlphaShape2D()
                                    edgeAS.first->vertex((edgeAS.second+2)%3)->info()};
 
             facet.m_outNodeIndex = edgeAS.first->vertex((edgeAS.second)%3)->info();
+            facet.m_elementIndex = face->info().index;
 
             if(!(m_nodesList[facet.m_nodesIndexes[0]].isBound() && m_nodesList[facet.m_nodesIndexes[1]].isBound()))
             {

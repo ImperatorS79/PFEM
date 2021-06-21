@@ -65,7 +65,13 @@ inline std::array<double, 3> Mesh::getBoundFSNormal(std::size_t nodeIndex) const
     auto it = m_boundFSNormal.find(nodeIndex);
 
     if(it == m_boundFSNormal.end())
-        throw std::runtime_error("node index " + std::to_string(nodeIndex) + ": normal is only available for free surface and boundary nodes!");
+    {
+        const Node& node = getNode(nodeIndex);
+        throw std::runtime_error("node index " + std::to_string(nodeIndex) + " at position (" +
+                                  std::to_string(node.getCoordinate(0)) + ", " +  std::to_string(node.getCoordinate(1)) + ", " +
+                                  std::to_string(node.getCoordinate(2)) + "): normal is only available for free surface and boundary nodes!");
+    }
+
     else
         return it->second;
 }

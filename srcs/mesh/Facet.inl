@@ -10,6 +10,11 @@ inline std::size_t Facet::getOutNodeIndex() const noexcept
     return m_outNodeIndex;
 }
 
+inline std::size_t Facet::getElementIndex() const noexcept
+{
+    return m_elementIndex;
+}
+
 inline double Facet::getDetJ() const noexcept
 {
     return m_detJ;

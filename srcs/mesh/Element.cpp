@@ -161,6 +161,40 @@ double Element::getSize() const noexcept
     return m_detJ*m_pMesh->getRefElementSize(m_pMesh->getDim());
 }
 
+double Element::getMinNodeDist() const noexcept
+{
+    if(m_pMesh->getDim() == 2)
+    {
+        const Node& n0 = this->getNode(0);
+        const Node& n1 = this->getNode(1);
+        const Node& n2 = this->getNode(2);
+
+        std::array<double, 3> dist;
+        dist[0] = Node::distance(n0, n1);
+        dist[1] = Node::distance(n1, n2);
+        dist[2] = Node::distance(n0, n2);
+
+        return *std::min_element(dist.begin(), dist.end());
+    }
+    else
+    {
+        const Node& n0 = this->getNode(0);
+        const Node& n1 = this->getNode(1);
+        const Node& n2 = this->getNode(2);
+        const Node& n3 = this->getNode(3);
+
+        std::array<double, 6> dist;
+        dist[0] = Node::distance(n0, n1);
+        dist[1] = Node::distance(n1, n2);
+        dist[2] = Node::distance(n0, n2);
+        dist[3] = Node::distance(n0, n3);
+        dist[4] = Node::distance(n1, n3);
+        dist[5] = Node::distance(n2, n3);
+
+        return *std::min_element(dist.begin(), dist.end());
+    }
+}
+
 double Element::getRin() const noexcept
 {
     if(m_pMesh->getDim() == 2)

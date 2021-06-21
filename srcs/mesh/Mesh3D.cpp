@@ -235,7 +235,7 @@ void Mesh::triangulateAlphaShape3D()
                 cell = facetAS.first;
             }
 
-            if(checkCellDeletion(cell)) //When we delete slivers, "hole" in the surface...
+            if(!cell->info().keep)
                 continue;
 
             Facet facet(*this);
@@ -243,6 +243,8 @@ void Mesh::triangulateAlphaShape3D()
                                     facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 1))->info(),
                                     facetAS.first->vertex(asTriangulation_3::vertex_triple_index(facetAS.second, 2))->info()};
             facet.m_outNodeIndex = facetAS.first->vertex(facetAS.second)->info();
+            facet.m_elementIndex = cell->info().index;
+
             facet.computeJ();
             facet.computeDetJ();
             facet.computeInvJ();
