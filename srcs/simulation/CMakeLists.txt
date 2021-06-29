@@ -7,7 +7,7 @@ endif()
 
 find_package(Lua 5.1 REQUIRED)
 
-if(USE_MKL_WITH_TBB)
+if(USE_MKL)
     find_package(MKL REQUIRED)
     if(MKL_FOUND)
         message(STATUS "MKL Found: " ${MKL_INCLUDE_DIR})
@@ -19,6 +19,8 @@ if(USE_MKL_WITH_TBB)
         message(STATUS "MKL Found: " ${MKL_TBB_LIB_ST})
     endif()
 endif()
+
+
 
 find_path(SOL3_INCLUDE_DIRS NAMES "sol/sol.hpp")
 if(NOT SOL3_INCLUDE_DIRS)
