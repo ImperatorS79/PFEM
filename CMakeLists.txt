@@ -9,7 +9,7 @@ project(PFEM VERSION 1.0
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake")
 
 option(USE_MKL "Use MKL" OFF)
-option(USE_TBB_CGAL "Use TBB with CGAL" ON)
+option(USE_TBB_CGAL "Use TBB with CGAL" OFF)
 if(USE_MKL AND (MINGW OR MSYS))
     message(FATAL_ERROR "Unfortunately MKL cannot be used with mingw :/.")
 endif()
