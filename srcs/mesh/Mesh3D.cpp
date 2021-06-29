@@ -23,7 +23,11 @@ typedef CGAL::Triangulation_vertex_base_with_info_3<std::size_t, Kernel>        
 typedef CGAL::Triangulation_cell_base_with_info_3<CellInfo, Kernel>             Cb3;
 typedef CGAL::Fixed_alpha_shape_vertex_base_3<Kernel, Vb3>                      asVb3;
 typedef CGAL::Fixed_alpha_shape_cell_base_3<Kernel, Cb3>                        asCb3;
-typedef CGAL::Triangulation_data_structure_3<asVb3, asCb3>                      asTds3;
+#ifdef CGAL_LINKED_WITH_TBB
+    typedef CGAL::Triangulation_data_structure_3<asVb3, asCb3, CGAL::Parallel_tag> asTds3;
+#elseif
+    typedef CGAL::Triangulation_data_structure_3<asVb3, asCb3> asTds3;
+#endif
 typedef CGAL::Delaunay_triangulation_3<Kernel, asTds3, CGAL::Fast_location>     asTriangulation_3;
 typedef CGAL::Fixed_alpha_shape_3<asTriangulation_3>                            Alpha_shape_3;
 typedef Kernel::Point_3                                                         Point_3;

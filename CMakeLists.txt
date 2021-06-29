@@ -8,9 +8,9 @@ project(PFEM VERSION 1.0
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake")
 
-option(USE_MKL_WITH_TBB "Use MKL with TBB" OFF)
-SET(USE_MKL_WITH_TBB OFF CACHE BOOL "" FORCE)
-if(USE_MKL_WITH_TBB AND (MINGW OR MSYS))
+option(USE_MKL "Use MKL" OFF)
+option(USE_TBB_CGAL "Use TBB with CGAL" ON)
+if(USE_MKL AND (MINGW OR MSYS))
     message(FATAL_ERROR "Unfortunately MKL cannot be used with mingw :/.")
 endif()
 
@@ -27,14 +27,12 @@ if(NOT USE_MARCH)
 	set(USE_MARCH 0 CACHE STRING "" FORCE)
 endif()
 
-if(CMAKE_BUILD_TYPE MATCHES "Release")
-	if(USE_MARCH)
-		check_cxx_compiler_flag("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
-		if(COMPILER_SUPPORTS_MARCH_NATIVE)
-			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-			message(STATUS "Using -march=native")
-		endif()
-	endif()
+if(USE_MARCH)
+    check_cxx_compiler_flag("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+    if(COMPILER_SUPPORTS_MARCH_NATIVE)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+        message(STATUS "Using -march=native")
+    endif()
 endif()
 
 # put all generated files in a single folder (required in windows for exe linked to dlls)

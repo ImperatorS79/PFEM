@@ -10,6 +10,17 @@ if(CGAL_FOUND)
     message(STATUS "Found CGAL: " ${CGAL_DIR})
 endif()
 
+if(USE_TBB_CGAL)
+    find_package(TBB)
+    if(TBB_FOUND)
+        message(STATUS "Found TBB: " ${TBB_LIBRARIES})
+    else()
+        message(FATAL_ERROR "TBB not found!")
+    endif()
+endif()
+
+include(CGAL_TBB_support)
+
 file(GLOB_RECURSE LIBMESH_SRCS
      "${PROJECT_SOURCE_DIR}/srcs/mesh/*.h"
      "${PROJECT_SOURCE_DIR}/srcs/mesh/*.inl"
@@ -20,7 +31,10 @@ add_library(pfemMesh SHARED ${LIBMESH_SRCS})
 target_include_directories(pfemMesh SYSTEM
                            PRIVATE ${EIGEN_INCLUDE_DIRS}
                            PRIVATE ${GMSH_INCLUDE_DIRS})
-target_link_libraries(pfemMesh PRIVATE OpenMP::OpenMP_CXX  CGAL::CGAL ${GMSH_LIBRARIES})#
+target_link_libraries(pfemMesh PRIVATE OpenMP::OpenMP_CXX  CGAL::CGAL ${GMSH_LIBRARIES})
+if(USE_TBB_CGAL)
+    target_link_libraries(pfemMesh PRIVATE CGAL::TBB_support)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES GNU)
     target_compile_options(pfemMesh PRIVATE -Wall -Wextra -pedantic-errors -Wold-style-cast -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast -Wshadow)
