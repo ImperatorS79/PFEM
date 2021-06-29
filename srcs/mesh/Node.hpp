@@ -43,9 +43,6 @@ class MESH_API Node
         /// \return The states of the node.
         inline std::vector<double> getStates() const noexcept;
 
-        /// \return The user-defined flag of the node.
-        inline bool getFlag(unsigned short flag) const noexcept;
-
         /// \param elementIndex The index of the node's element.
         /// \return The index of the element in the mesh.
         inline std::size_t getElementMeshIndex(unsigned int elementIndex) const noexcept;
@@ -67,6 +64,8 @@ class MESH_API Node
 
         /// \return The number of facets the node is inside.
         inline unsigned int getFacetCount() const noexcept;
+
+        inline int getTag() const noexcept;
 
         /// \return Is the node on a boundary ?
         inline bool isBound() const noexcept;
@@ -104,7 +103,6 @@ class MESH_API Node
         bool m_isFixed = false;                     /**< Is the node fixed (has a speed but does not move) ? */
 
         int m_tag = -1;                             /**< Identify to which Physical group this node belongs to.*/
-        std::bitset<8> m_userDefFlags;              /**< User define flags (can be used to tag nodes based on BC to apply).*/
 
         friend class Mesh;
 };

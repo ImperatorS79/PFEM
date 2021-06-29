@@ -92,6 +92,8 @@ class MESH_API Facet
         /// \return The position in real space.
         std::array<double, 3> getPosFromGP(const std::array<double, 3>& gp) const noexcept;
 
+        inline std::array<double, 3> getNormal() const noexcept;
+
         friend inline bool operator==(const Facet& a, const Facet& b) noexcept;
 
         Facet& operator=(const Facet& facet)   = default;
@@ -108,6 +110,8 @@ class MESH_API Facet
         std::array<std::array<double, 2>, 3> m_J;       /**< Jacobian matrix of the facet. */
         std::array<std::array<double, 3>, 2> m_invJ;    /**< Inverse Jacobian matrix of the facet. */
 
+        std::array<double, 3> m_normal;
+
         /// Compute the Jacobian matrix of the change of variable to the reference space.
         void computeJ();
 
@@ -116,6 +120,8 @@ class MESH_API Facet
 
         /// Compute the inverse of Jacobian matrix of the change of variable to the reference space.
         void computeInvJ();
+
+        void computeNormal();
 
         friend class Mesh;
 };

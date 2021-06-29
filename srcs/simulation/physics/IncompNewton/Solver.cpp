@@ -49,7 +49,7 @@ Solver(pProblem, pMesh, problemParams)
                 bool res = checkBC(bcParam, n, node, "V", m_pMesh->getDim());
 
                 if(res)
-                    m_pMesh->setNodeFlag(n, 0);
+                    m_bcTagFlags[node.getTag()].set(0);
             }
         }
 
@@ -87,13 +87,13 @@ Solver(pProblem, pMesh, problemParams)
                 bool resQ = checkBC(bcParamHeat, n, node, "Q", m_pMesh->getDim());
 
                 if(resV)
-                    m_pMesh->setNodeFlag(n, 0);
+                    m_bcTagFlags[node.getTag()].set(0);
 
                 if(resT)
-                    m_pMesh->setNodeFlag(n, 1);
+                    m_bcTagFlags[node.getTag()].set(1);
 
                 if(resQ)
-                    m_pMesh->setNodeFlag(n, 2);
+                    m_bcTagFlags[node.getTag()].set(2);
 
                 if(resT && resQ)
                     throw std::runtime_error("the boundary " + m_pMesh->getNodeType(n) +
@@ -129,10 +129,10 @@ Solver(pProblem, pMesh, problemParams)
                 bool resQ = checkBC(bcParamHeat, n, node, "Q", m_pMesh->getDim());
 
                 if(resT)
-                    m_pMesh->setNodeFlag(n, 1);
+                    m_bcTagFlags[node.getTag()].set(1);
 
                 if(resQ)
-                    m_pMesh->setNodeFlag(n, 2);
+                    m_bcTagFlags[node.getTag()].set(2);
 
                 if(resT && resQ)
                     throw std::runtime_error("the boundary " + m_pMesh->getNodeType(n) +

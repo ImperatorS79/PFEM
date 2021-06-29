@@ -19,7 +19,7 @@ Solver(pProblem, pMesh, problemParams)
     if(m_pProblem->getID() != "WCompNewtonNoT" && m_pProblem->getID() != "BoussinesqWC")
         throw std::runtime_error("this solver cannot be used with problem whose id is " + m_pProblem->getID());
 
-    if(m_id != "CDS_Meduri" && m_id != "CDS_FIC")
+    if(m_id != "CDS_drhodt" && m_id != "CDS_rho" && m_id != "CDS_dpdt")
         throw std::runtime_error("this solver does not know id " + m_id);
 
     //Load material params for equations
@@ -63,7 +63,7 @@ Solver(pProblem, pMesh, problemParams)
                 bool res = checkBC(bcParam, n, node, "V", m_pMesh->getDim());
 
                 if(res)
-                    m_pMesh->setNodeFlag(n, 0);
+                    m_bcTagFlags[node.getTag()].set(0);
             }
         }
 
@@ -88,7 +88,7 @@ Solver(pProblem, pMesh, problemParams)
         else
             m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 3)
 
-        bcFlags = {1, 2}; //Dirichlet and Neumann
+        bcFlags = {1, 2, 3, 4}; //Dirichlet and Neumann
         statesIndex = {2*dim + 2, dim + 1};
         if(m_pMesh->getDim() == 2)
             m_pEquations[2] = REGISTER_EQ(HeatEqWCompNewton, 2)
@@ -105,18 +105,26 @@ Solver(pProblem, pMesh, problemParams)
             {
                 bool resV = checkBC(bcParamMomCont, n, node, "V", m_pMesh->getDim());
                 bool resT = checkBC(bcParamHeat, n, node, "T", 1);
-                bool resQ = checkBC(bcParamHeat, n, node, "Q", 1);
+                bool resQ = checkBC(bcParamHeat, n, node, "Q", dim);
+                bool resQh = bcParamHeat.doesVarExist(m_pMesh->getNodeType(n) + "Qh") && bcParamHeat.checkAndGet<bool>(m_pMesh->getNodeType(n) + "Qh");
+                bool resQr = bcParamHeat.doesVarExist(m_pMesh->getNodeType(n) + "Qr") && bcParamHeat.checkAndGet<bool>(m_pMesh->getNodeType(n) + "Qr");
 
                 if(resV)
-                    m_pMesh->setNodeFlag(n, 0);
+                    m_bcTagFlags[node.getTag()].set(0);
 
                 if(resT)
-                    m_pMesh->setNodeFlag(n, 1);
+                    m_bcTagFlags[node.getTag()].set(1);
 
                 if(resQ)
-                    m_pMesh->setNodeFlag(n, 2);
+                    m_bcTagFlags[node.getTag()].set(2);
 
-                if(resT && resQ)
+                if(resQh)
+                    m_bcTagFlags[node.getTag()].set(3);
+
+                if(resQr)
+                    m_bcTagFlags[node.getTag()].set(4);
+
+                if(resT && (resQ || resQh || resQr))
                     throw std::runtime_error("the boundary " + m_pMesh->getNodeType(n) +
                                              "has a BC for both T and Q. This is forbidden!");
             }
@@ -158,7 +166,7 @@ void SolverWCompNewton::displayParams() const
 
 std::size_t SolverWCompNewton::getAdditionalStateCount() const
 {
-    return (m_id == "CDS_FIC") ? 1 : 0;
+    return 0; //Change this
 }
 
 bool SolverWCompNewton::solveOneTimeStep()
@@ -180,7 +188,7 @@ void SolverWCompNewton::computeNextDT()
         for(std::size_t elm = 0 ; elm < m_pMesh->getElementsCount() ; ++elm)
         {
             const Element& element = m_pMesh->getElement(elm);
-            double he = element.getRin();
+            double he = 2*element.getRin();
 
             double maxSquaredSpeedFluidPressureVN = 0;
             double maxSquaredSpeedFluid = 0;
@@ -233,6 +241,7 @@ bool SolverWCompNewton::m_solveWCompNewtonNoT()
     m_clock.start();
     m_pEquations[0]->solve();
     m_accumalatedTimes["Solving continuity eq"] += m_clock.end();
+
     m_clock.start();
     m_pEquations[1]->solve();
     m_accumalatedTimes["Solving momentum eq"] += m_clock.end();
@@ -243,6 +252,8 @@ bool SolverWCompNewton::m_solveWCompNewtonNoT()
     {
         m_pMesh->remesh(m_pProblem->isOutputVerbose());
         m_nextTimeToRemesh += m_maxDT;
+        for(auto& pMeshSmoother: m_pMeshSmoothers)
+            pMeshSmoother->smooth(m_pProblem->isOutputVerbose());
     }
     m_accumalatedTimes["Remeshing"] += m_clock.end();
 

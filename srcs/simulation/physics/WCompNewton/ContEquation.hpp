@@ -7,6 +7,19 @@
 class Problem;
 class Mesh;
 
+enum class EqType
+{
+    Rho,
+    DRhoDt,
+    DPDt
+};
+
+enum class Stab
+{
+    None,
+    Meduri
+};
+
 template<unsigned short dim>
 class ContEqWCompNewton : public Equation
 {
@@ -33,13 +46,13 @@ class ContEqWCompNewton : public Equation
         double m_mu;
         double m_alpha;
         double m_Tr;
-        Eigen::VectorXd m_bodyForce;
-        bool m_strongContinuity;
-        bool m_enableStab;
-        double m_keStab;
+        EqType m_version;
+        Stab m_stabilization;
 
         std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder;
-        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder2; // TO DO: change mat builder to allow multiple M functions
+
+        std::vector<Eigen::DiagonalMatrix<double, dim + 1>> m_MeLumped;
+        std::vector<Eigen::Matrix<double, dim + 1, 1>> m_F0e;
 
         Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invM;
         Eigen::VectorXd m_F0;
@@ -47,7 +60,11 @@ class ContEqWCompNewton : public Equation
         void m_buildF0();
         void m_buildSystem();
         void m_applyBC();
-        Eigen::VectorXd m_getPFromRhoTaitMurnagham(const Eigen::VectorXd& rho);
+        Eigen::VectorXd m_getPFromRhoTaitMurnagham(const Eigen::VectorXd& qRho);
+        Eigen::VectorXd m_getRhoFromPTaitMurnagham(const Eigen::VectorXd& qP);
+
+        void m_buildSystemdpdt();
+        void m_applyBCdpdt();
 
         void m_buildSystemFIC();
         void m_applyBCFIC();

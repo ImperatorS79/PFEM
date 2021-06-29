@@ -20,11 +20,6 @@ inline double Node::getState(unsigned int state) const noexcept
     return m_states[state];
 }
 
-inline bool Node::getFlag(unsigned short flag) const noexcept
-{
-    return m_userDefFlags[flag];
-}
-
 inline unsigned int Node::getElementCount() const noexcept
 {
     return m_elements.size();
@@ -43,6 +38,11 @@ inline unsigned int Node::getFacetCount() const noexcept
 inline std::size_t Node::getFacetMeshIndex(unsigned int facetIndex) const noexcept
 {
     return m_facets[facetIndex];
+}
+
+inline int Node::getTag() const noexcept
+{
+    return m_tag;
 }
 
 inline bool Node::isFree() const noexcept

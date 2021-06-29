@@ -62,6 +62,9 @@ std::array<double, 3> Mesh::getBoundNodeInitPos(std::size_t nodeIndex) const
 
 inline std::array<double, 3> Mesh::getBoundFSNormal(std::size_t nodeIndex) const
 {
+    if(m_computeNormalCurvature == false)
+        throw std::runtime_error("you tried to access a node normal but you did not enable their computation!");
+
     auto it = m_boundFSNormal.find(nodeIndex);
 
     if(it == m_boundFSNormal.end())
@@ -78,10 +81,18 @@ inline std::array<double, 3> Mesh::getBoundFSNormal(std::size_t nodeIndex) const
 
 inline double Mesh::getFreeSurfaceCurvature(std::size_t nodeIndex) const
 {
+    if(m_computeNormalCurvature == false)
+        throw std::runtime_error("you tried to access a free surface node curvature but you did not enable their computation!");
+
     auto it = m_freeSurfaceCurvature.find(nodeIndex);
 
     if(it == m_freeSurfaceCurvature.end())
-        throw std::runtime_error("node index " + std::to_string(nodeIndex) + ": curvature is only available for free surface nodes!");
+    {
+        const Node& node = getNode(nodeIndex);
+        throw std::runtime_error("node index " + std::to_string(nodeIndex)  + " at position (" +
+                                  std::to_string(node.getCoordinate(0)) + ", " +  std::to_string(node.getCoordinate(1)) + ", " +
+                                  std::to_string(node.getCoordinate(2)) + "): curvature is only available for free surface nodes!");
+    }
     else
         return it->second;
 }
@@ -109,11 +120,6 @@ inline bool Mesh::isNormalCurvComputed() const noexcept
 inline void Mesh::setComputeNormalCurvature(bool activate) noexcept
 {
     m_computeNormalCurvature = activate;
-}
-
-inline void Mesh::setNodeFlag(std::size_t nodeIndex, unsigned short flag) noexcept
-{
-    m_nodesList[nodeIndex].m_userDefFlags.set(flag, 1);
 }
 
 inline void Mesh::setNodeIsFixed(std::size_t nodeIndex, bool isFixed) noexcept

@@ -44,6 +44,7 @@ class MomContEqIncompNewton : public Equation
         double m_rho;
         double m_mu;
         double m_gamma;
+        double m_DgammaDT;
         double m_alpha;
         double m_Tr;
         double m_tau0;

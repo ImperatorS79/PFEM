@@ -195,36 +195,30 @@ void MomContEqIncompNewton<dim>::m_applyBCVAppStep(const Eigen::VectorXd& qPrev)
     {
         const Facet& facet = m_pMesh->getFacet(f);
 
-        bool onFS = true;
+        bool onFS = false;
         for(unsigned short n = 0 ; n < noPerFacet ; ++n)
         {
-            if(!facet.getNode(n).isOnFreeSurface())
+            if(facet.getNode(n).isOnFreeSurface())
             {
-                onFS = false;
+                onFS = true;
                 break;
             }
         }
         if(!onFS)
             continue;
 
-        auto MGamma_s = m_pMatBuilder->getMGamma(facet);
-        auto MGamma = MatrixBuilder<dim>::diagBlock(MGamma_s);
+        const Element& element = facet.getElement();
+        GradNmatType<dim> gradNe = m_pMatBuilder->getGradN(element);
+        BmatType<dim> Be = m_pMatBuilder->getB(gradNe);
 
-        Eigen::Matrix<double, dim*noPerFacet, 1> nVec;
-        for(uint8_t n = 0 ; n < noPerFacet; ++n)
-        {
-            std::array<double, 3> normal = m_pMesh->getBoundFSNormal(facet.getNodeIndex(n));
+        Eigen::Matrix<double, dim*(dim + 1), 1> FST = m_pMatBuilder->getFST(facet, gradNe, Be);
 
-            for(uint8_t d = 0 ; d < dim ; ++d)
-                nVec(n + d*noPerFacet) = normal[d];
-        }
-
-        Eigen::Matrix<double, dim*noPerFacet, 1> Ff = MGamma*nVec;
-
-        for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+        for(unsigned short n = 0 ; n < dim + 1 ; ++n)
         {
             for(unsigned short d = 0 ; d < dim ; ++d)
-                m_bVAppStep(facet.getNodeIndex(i) + d*nodesCount) += Ff[d*noPerFacet + i];
+            {
+                m_bVAppStep[element.getNodeIndex(n) + d*nodesCount] += FST[n + d*(dim + 1)];
+            }
         }
     }
 
@@ -246,7 +240,7 @@ void MomContEqIncompNewton<dim>::m_applyBCVAppStep(const Eigen::VectorXd& qPrev)
 
         if(node.isBound())
         {
-            if(node.getFlag(m_bcFlags[0]))
+            if(m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[0]))
             {
                 std::array<double, dim> result; //TO do: try to change that
                 result = m_bcParams[0].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",

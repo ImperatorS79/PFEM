@@ -164,6 +164,55 @@ auto MatrixBuilder<dim, noPerEl>::getB(const GradNmatType& gradN) -> MatrixBuild
 }
 
 template<unsigned short dim, unsigned short noPerEl>
+Eigen::Matrix<double, dim*dim - 2*dim +3, 1> MatrixBuilder<dim, noPerEl>::getP(const Facet& facet)
+{
+    Eigen::Matrix<double, dim*dim - 2*dim +3, 1> P;
+    std::array<double, 3> normal = facet.getNormal();
+
+    if constexpr (dim == 2)
+    {
+        P[0] = 1 - normal[0]*normal[0];
+        P[1] = 1 - normal[1]*normal[1];
+        P[2] = - normal[0]*normal[1];
+    }
+    else if constexpr (dim == 3)
+    {
+        P[0] = 1 - normal[0]*normal[0];
+        P[1] = 1 - normal[1]*normal[1];
+        P[2] = 1 - normal[2]*normal[2];
+        P[3] = - normal[0]*normal[1];
+        P[4] = - normal[0]*normal[2];
+        P[5] = - normal[1]*normal[2];
+    }
+
+    return P;
+}
+
+template<unsigned short dim, unsigned short noPerEl>
+Eigen::Matrix<double, dim*dim - 2*dim +3, dim*dim - 2*dim +3> MatrixBuilder<dim, noPerEl>::getT(const Eigen::Matrix<double, dim*dim - 2*dim +3, 1>& P)
+{
+    Eigen::Matrix<double, dim*dim - 2*dim +3, dim*dim - 2*dim +3> T;
+
+    if constexpr (dim == 2)
+    {
+        T(0,0) = P[0]*P[0];         T(0,1) = P[2]*P[2];         T(0,2) = 2*P[0]*P[2];
+        T(1,0) = T(0,1);            T(1,1) = P[1]*P[1];         T(1,2) = 2*P[2]*P[1];
+        T(2,0) = P[0]*P[2];         T(2,1) = P[2]*P[1];         T(2,2) = P[0]*P[1] + P[2]*P[2];
+    }
+    else if constexpr (dim == 3)
+    {
+        T(0,0) = P[0]*P[0];         T(0,1) = P[3]*P[3];         T(0,2) = P[4]*P[4];     T(0,3) = 2*P[0]*P[3];                   T(0,4) = 2*P[4]*P[3];               T(0,5) = 2*P[0]*P[4];
+        T(1,0) = T(0,1);            T(1,1) = P[1]*P[1];         T(1,2) = P[5]*P[5];     T(1,3) = 2*P[3]*P[1];                   T(1,4) = 2*P[5]*P[1];               T(1,5) = 2*P[2]*P[4];
+        T(2,0) = T(0,2);            T(2,1) = T(1,2);            T(2,2) = P[2]*P[2];     T(2,3) = 2*P[5]*P[4];                   T(2,4) = 2*P[5]*P[2];               T(2,5) = 2*P[2]*P[4];
+        T(3,0) = T(0,3);            T(3,1) = T(1,3);            T(3,2) = T(2,3);        T(3,3) = P[0]*P[1] + P[3]*P[3];         T(3,4) = P[4]*P[1] + P[5]*P[3];     T(3,5) = P[4]*P[3] + P[0]*P[5];
+        T(4,0) = T(0,4);            T(4,1) = T(4,1);            T(4,2) = T(2,4);        T(4,3) = T(3,4);                        T(4,4) = P[1]*P[2] + P[5]*P[5];     T(4,5) = P[5]*P[4] + P[3]*P[2];
+        T(5,0) = T(0,5);            T(5,1) = T(1,5);            T(5,2) = T(2,5);        T(5,3) = T(3,5);                        T(5,4) = T(4,5);                    T(5,5) = P[2]*P[3] + P[4]*P[4];
+    }
+
+    return T;
+}
+
+template<unsigned short dim, unsigned short noPerEl>
 Eigen::Matrix<double, noPerEl, noPerEl> MatrixBuilder<dim, noPerEl>::getM(const Element& element)
 {
     Eigen::Matrix<double, noPerEl, noPerEl>  M; M.setZero();
@@ -197,20 +246,26 @@ template<unsigned short dim, unsigned short noPerEl>
 Eigen::Matrix<double, dim, 1> MatrixBuilder<dim, noPerEl>::getQN(const Facet& facet)
 {
     Eigen::Matrix<double, dim, 1> qn; qn.setZero();
-    Eigen::Matrix<double, dim*dim, 1> n;
 
-    for(std::size_t i = 0 ; i < noPerEl ; ++i)
+    std::array<double, 3> normal = facet.getNormal();
+    Eigen::Matrix<double, dim, 1> n;
+
+    if constexpr (dim == 2)
     {
-        std::array<double, 3> nodeNormal = m_mesh.getBoundFSNormal(facet.getNodeIndex(i));
-
-        for(std::size_t d = 0 ; d < dim ; ++d)
-            n(d*noPerEl + i) = nodeNormal[d];
+        n[0] = normal[0];
+        n[1] = normal[1];
+    }
+    else if constexpr (dim == 3)
+    {
+        n[0] = normal[0];
+        n[1] = normal[1];
+        n[2] = normal[2];
     }
 
     for(unsigned int i = 0 ; i < m_NLD.size() ; ++i)
     {
         Eigen::Matrix<double, dim, 1> q = m_QFunc(facet, m_gaussPointsLD[i]);
-        double fact = (q.transpose()*m_NLDtilde[i]*n).value()*m_gaussWeightLD[i];
+        double fact = (q.transpose()*n).value()*m_gaussWeightLD[i];
         qn += fact*m_NLD[i].transpose();
     }
 
@@ -299,6 +354,21 @@ Eigen::Matrix<double, dim*noPerEl, 1> MatrixBuilder<dim, noPerEl>::getF(const El
 }
 
 template<unsigned short dim, unsigned short noPerEl>
+Eigen::Matrix<double, noPerEl - 1, 1> MatrixBuilder<dim, noPerEl>::getSGamma(const Facet& facet)
+{
+    Eigen::Matrix<double, noPerEl - 1, 1> SGamma; SGamma.setZero();
+
+    for(unsigned int i = 0 ; i < m_NLD.size() ; ++ i)
+    {
+        SGamma += m_SGammafunc(facet, m_NLD[i])*m_NLD[i].transpose()*m_gaussWeightLD[i];
+    }
+
+    SGamma *= facet.getDetJ()*m_mesh.getRefElementSize(dim - 1);
+
+    return SGamma;
+}
+
+template<unsigned short dim, unsigned short noPerEl>
 Eigen::Matrix<double, noPerEl, 1> MatrixBuilder<dim, noPerEl>::getH(const Element& element, const Eigen::Matrix<double, dim, 1>& vec,
                                     const BmatType& B, const GradNmatType& gradN)
 {
@@ -312,6 +382,23 @@ Eigen::Matrix<double, noPerEl, 1> MatrixBuilder<dim, noPerEl>::getH(const Elemen
     H *= element.getDetJ()*m_mesh.getRefElementSize(dim);
 
     return H;
+}
+
+template<unsigned short dim, unsigned short noPerEl>
+Eigen::Matrix<double, dim*noPerEl, 1> MatrixBuilder<dim, noPerEl>::getFST(const Facet& facet, const GradNmatType& gradNe, const BmatType& Be)
+{
+    Eigen::Matrix<double, dim*noPerEl, 1> FST; FST.setZero();
+
+    for(unsigned int i = 0 ; i < m_NLD.size() ; ++ i)
+    {
+        Eigen::Matrix<double, dim*dim - 2*dim +3, 1> P = getP(facet);
+        Eigen::Matrix<double, dim*dim - 2*dim +3, dim*dim - 2*dim +3> T = getT(P);
+        FST -= m_FSTfunc(facet, m_NLD[i], m_NLDtilde[i], gradNe)*Be.transpose()*T*P*m_gaussWeightLD[i];
+    }
+
+    FST *= facet.getDetJ()*m_mesh.getRefElementSize(dim - 1);
+
+    return FST;
 }
 
 template<unsigned short dim, unsigned short noPerEl>
@@ -369,9 +456,21 @@ void MatrixBuilder<dim, noPerEl>::setFcomputeFactor(matFuncElm computeFactor)
 }
 
 template<unsigned short dim, unsigned short noPerEl>
+void MatrixBuilder<dim, noPerEl>::setSGammacomputeFactor(simpleMatFuncFacet computeFactor)
+{
+    m_SGammafunc = computeFactor;
+}
+
+template<unsigned short dim, unsigned short noPerEl>
 void MatrixBuilder<dim, noPerEl>::setHcomputeFactor(matFuncElm computeFactor)
 {
     m_Hfunc = computeFactor;
+}
+
+template<unsigned short dim, unsigned short noPerEl>
+void MatrixBuilder<dim, noPerEl>::setFSTcomputeFactor(matFuncFacet computeFactor)
+{
+    m_FSTfunc = computeFactor;
 }
 
 template<unsigned short dim, unsigned short noPerEl>

@@ -127,6 +127,88 @@ void Facet::computeInvJ()
     }
 }
 
+void Facet::computeNormal()
+{
+    if(m_pMesh->getDim() == 2)
+    {
+        const Node& node = getNode(0);
+        const Node& node1 = getNode(1);
+        const Node& outNode = getOutNode();
+
+        double x0 = node.getCoordinate(0);
+        double x1 = node1.getCoordinate(0);
+
+        double y0 = node.getCoordinate(1);
+        double y1 = node1.getCoordinate(1);
+
+        m_normal = {
+            y1 - y0,
+            x0 - x1,
+            0
+        };
+
+        std::array<double, 3> vecToOutNode = {
+            outNode.getCoordinate(0) - x0,
+            outNode.getCoordinate(1) - y0,
+            0
+        };
+
+        if(m_normal[0]*vecToOutNode[0] + m_normal[1]*vecToOutNode[1] > 0)
+        {
+            m_normal[0] *= -1;
+            m_normal[1] *= -1;
+        }
+
+        double norm = std::sqrt(m_normal[0]*m_normal[0] + m_normal[1]*m_normal[1]);
+        m_normal[0] /= norm;
+        m_normal[1] /= norm;
+    }
+    else
+    {
+        const Node& node = getNode(0);
+        const Node& node1 = getNode(1);
+        const Node& node2 = getNode(2);
+        const Node& outNode = getOutNode();
+
+        std::array<double, 3> a = {
+            node1.getCoordinate(0) - node.getCoordinate(0),
+            node1.getCoordinate(1) - node.getCoordinate(1),
+            node1.getCoordinate(2) - node.getCoordinate(2)
+        };
+
+        std::array<double, 3> b = {
+            node2.getCoordinate(0) - node.getCoordinate(0),
+            node2.getCoordinate(1) - node.getCoordinate(1),
+            node2.getCoordinate(2) - node.getCoordinate(2)
+        };
+
+        m_normal = {
+            a[1]*b[2] - a[2]*b[1],
+            a[2]*b[0] - a[0]*b[2],
+            a[0]*b[1] - a[1]*b[0]
+        };
+
+        std::array<double, 3> vecToOutNode = {
+            outNode.getCoordinate(0) - node.getCoordinate(0),
+            outNode.getCoordinate(1) - node.getCoordinate(1),
+            outNode.getCoordinate(2) - node.getCoordinate(2)
+        };
+
+        if(vecToOutNode[0]*m_normal[0] + vecToOutNode[1]*m_normal[1] + vecToOutNode[2]*m_normal[2] > 0)
+        {
+            m_normal[0] *= -1.0;
+            m_normal[1] *= -1.0;
+            m_normal[2] *= -1.0;
+        }
+
+        double norm = std::sqrt(m_normal[0]*m_normal[0] + m_normal[1]*m_normal[1] + m_normal[2]*m_normal[2]);
+
+        m_normal[0] /= norm;
+        m_normal[1] /= norm;
+        m_normal[2] /= norm;
+    }
+}
+
 const Node& Facet::getNode(unsigned int nodeIndex) const noexcept
 {
     return m_pMesh->getNode(m_nodesIndexes[nodeIndex]);

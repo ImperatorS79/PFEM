@@ -252,6 +252,8 @@ void Mesh::triangulateAlphaShape3D()
             facet.computeJ();
             facet.computeDetJ();
             facet.computeInvJ();
+            if(m_computeNormalCurvature)
+                facet.computeNormal();
 
             if(facet.m_outNodeIndex == facet.m_nodesIndexes[0] ||
                facet.m_outNodeIndex == facet.m_nodesIndexes[1] ||
@@ -280,7 +282,7 @@ void Mesh::triangulateAlphaShape3D()
     if(m_deleteFlyingNodes)
         deleteFlyingNodes(false);
 
-    computeFSNormalCurvature3D();
+    //computeFSNormalCurvature3D();
 }
 
 void Mesh::computeFSNormalCurvature3D()

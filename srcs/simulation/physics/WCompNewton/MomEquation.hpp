@@ -29,11 +29,19 @@ class MomEqWCompNewton : public Equation
 
     private:
         std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder;
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder2;
 
         double m_mu;
         double m_gamma;
         double m_alpha;
         double m_Tr;
+        double m_DgammaDT;
+
+        bool m_phaseChange;
+        double m_C;
+        double m_eps;
+        double m_Tm;
+        double m_DT;
 
         Eigen::Matrix<double, dim, 1> m_bodyForce;
 
@@ -42,6 +50,8 @@ class MomEqWCompNewton : public Equation
 
         void m_buildSystem();
         void m_applyBC();
+
+        double m_getFl(double T);
 };
 
 #include "MomEquation.inl"

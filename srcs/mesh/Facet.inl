@@ -30,6 +30,11 @@ inline double Facet::getInvJ(unsigned int i, unsigned int j) const noexcept
     return m_invJ[i][j];
 }
 
+inline std::array<double, 3> Facet::getNormal() const noexcept
+{
+    return m_normal;
+}
+
 inline bool operator==(const Facet& a, const Facet& b) noexcept
 {
     return std::equal(a.m_nodesIndexes.cbegin(), a.m_nodesIndexes.cend(), b.m_nodesIndexes.cbegin());

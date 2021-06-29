@@ -56,6 +56,26 @@ inline Eigen::Matrix<double, dim + 1, 1> getElementState(const Element& element,
 }
 
 template<unsigned short dim>
+inline Eigen::Matrix<double, dim, 1> getFacetState(const Facet& facet, unsigned int state)
+{
+    Eigen::Matrix<double, dim, 1> stateVec;
+
+    if constexpr (dim == 2)
+    {
+        stateVec[0] = facet.getNode(0).getState(state);
+        stateVec[1] = facet.getNode(1).getState(state);
+    }
+    else if constexpr (dim == 3)
+    {
+        stateVec[0] = facet.getNode(0).getState(state);
+        stateVec[1] = facet.getNode(1).getState(state);
+        stateVec[2] = facet.getNode(2).getState(state);
+    }
+
+    return stateVec;
+}
+
+template<unsigned short dim>
 inline Eigen::Matrix<double, dim + 1, 1> getElementState(const Eigen::VectorXd& q, const Element& element, unsigned short beginState, std::size_t nNodes)
 {
     Eigen::Matrix<double, dim + 1, 1> stateVec;

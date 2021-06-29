@@ -42,6 +42,8 @@ class SIMULATION_API Solver
 
         bool checkBC(SolTable bcParam, unsigned int n, const Node& node, std::string bcString, unsigned int expectedBCSize);
 
+        inline bool getBcTagFlags(int tag, unsigned short flag) const noexcept;
+
         /// \return The id of the solver (child class have to set m_id).
         std::string getID() const noexcept;
 
@@ -71,6 +73,8 @@ class SIMULATION_API Solver
 
         std::vector<std::unique_ptr<Equation>> m_pEquations;    /**< Smart pointers to the equations */
         bool m_solveSucceed;    /**< Did the solveOneTimeStep function succeeded ? */
+
+        std::map<int, std::bitset<8>> m_bcTagFlags;
 
         Mesh* m_pMesh;          /**< Pointer to the mesh used. */
         Problem* m_pProblem;    /**< Pointer to the underlying problem. */

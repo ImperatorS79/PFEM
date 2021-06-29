@@ -12,6 +12,9 @@
 #include "extractors/Extractors.hpp"
 #include "../mesh/Mesh.hpp"
 #include "utility/SignalHandler.h"
+#include "meshSmoother/PSmoother.hpp"
+#include "meshSmoother/GETMe.hpp"
+
 
 int g_shouldClose = 0;
 
@@ -149,19 +152,19 @@ std::vector<double> Problem::getMeshWrittableData(const std::string& name, std::
         else
             return {0, 0, 0};
     }
-    else if(name == "curvatures")
-    {
-        if(!m_pMesh->isNormalCurvComputed())
-            return {0};
-
-        if(m_pMesh->getNode(nodeIndex).isOnFreeSurface())
-        {
-            double curvature = m_pMesh->getFreeSurfaceCurvature(nodeIndex);
-            return {curvature};
-        }
-        else
-            return {0};
-    }
+//    else if(name == "curvatures")
+//    {
+//        if(!m_pMesh->isNormalCurvComputed())
+//            return {0};
+//
+//        if(m_pMesh->getNode(nodeIndex).isOnFreeSurface())
+//        {
+//            double curvature = m_pMesh->getFreeSurfaceCurvature(nodeIndex);
+//            return {curvature};
+//        }
+//        else
+//            return {0};
+//    }
     else if(name == "debug")
     {
         const Node& node = m_pMesh->getNode(nodeIndex);

@@ -32,6 +32,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     {
         m_alpha = m_materialParams[0].checkAndGet<double>("alpha");
         m_Tr = m_materialParams[0].checkAndGet<double>("Tr");
+        m_DgammaDT = m_materialParams[0].checkAndGet<double>("DgammaDT");
 
         if(statesIndex.size() != 2)
             throw std::runtime_error("the " + getID() + " equation require two statesIndex describing the beginning of the states span and the temperature state!");
@@ -84,15 +85,15 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         return m_rho;
     });
 
-    m_pMatBuilder->setMGammacomputeFactor([&](const Facet& facet,
-                                              const NmatTypeLD<dim>& N) -> double {
-        Eigen::Matrix<double, dim, 1> curvatures;
-        for(unsigned short i = 0 ; i < dim ; ++i)
-        {
-            curvatures[i] = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(i));
-        }
-        return m_gamma*N*curvatures;
-    });
+//    m_pMatBuilder->setMGammacomputeFactor([&](const Facet& facet,
+//                                              const NmatTypeLD<dim>& N) -> double {
+//        Eigen::Matrix<double, dim, 1> curvatures;
+//        for(unsigned short i = 0 ; i < dim ; ++i)
+//        {
+//            curvatures[i] = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(i));
+//        }
+//        return m_gamma*N*curvatures;
+//    });
 
     if(m_pProblem->getID() == "Bingham")
     {
@@ -165,6 +166,14 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
             return m_rho*(1 - m_alpha*(T - m_Tr));
         });
 
+        m_pMatBuilder->setFSTcomputeFactor([&](const Facet& facet,
+                                               const NmatTypeLD<dim>& N,
+                                               const NmatTildeTypeLD<dim>&  /** Ntilde **/,
+                                               const GradNmatType<dim>& /** gradNe **/) -> double {
+            double T = (N*getFacetState<dim>(facet, m_statesIndex[1])).value();
+            return m_gamma + m_DgammaDT*(T - m_Tr);
+        });
+
         if(m_pSolver->getID() == "PSPG")
         {
             m_pMatBuilder->setHcomputeFactor([&](const Element& element,
@@ -181,6 +190,13 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
                                              const NmatTypeHD<dim>& /** N **/,
                                              const BmatType<dim>& /** B **/) -> double {
             return m_rho;
+        });
+
+        m_pMatBuilder->setFSTcomputeFactor([&](const Facet& /** facet **/,
+                                               const NmatTypeLD<dim>& /** N **/,
+                                               const NmatTildeTypeLD<dim>&  /** Ntilde **/,
+                                               const GradNmatType<dim>& /** gradNe **/) -> double {
+            return m_gamma;
         });
 
         if(m_pSolver->getID() == "PSPG")

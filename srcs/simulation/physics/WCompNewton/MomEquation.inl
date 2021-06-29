@@ -23,6 +23,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         nGPLD = 3;
     }
     m_pMatBuilder = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
+    m_pMatBuilder2 = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
 
     m_mu = m_materialParams[0].checkAndGet<double>("mu");
     m_gamma = m_materialParams[0].checkAndGet<double>("gamma");
@@ -30,10 +31,25 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     if(bcFlags.size() != 1)
         throw std::runtime_error("the " + getID() + " only required one flag for one possible boundary condition!");
 
+    m_phaseChange = false;
+
     if(m_pProblem->getID() == "BoussinesqWC")
     {
         m_alpha = m_materialParams[0].checkAndGet<double>("alpha");
         m_Tr = m_materialParams[0].checkAndGet<double>("Tr");
+        m_DgammaDT = m_materialParams[0].checkAndGet<double>("DgammaDT");
+
+        if(m_materialParams[0].doesVarExist("Tm")  || m_materialParams[0].doesVarExist("C") ||
+           m_materialParams[0].doesVarExist("eps") || m_materialParams[0].doesVarExist("DT"))
+        {
+            m_phaseChange = true;
+
+            m_C = m_materialParams[0].doesVarExist("C");
+            m_eps = m_materialParams[0].doesVarExist("eps");
+            m_Tm = m_materialParams[0].doesVarExist("Tm");
+            m_DT = m_materialParams[0].doesVarExist("DT");
+        }
+
 
         if(statesIndex.size() != 5)
             throw std::runtime_error("the " + getID() + " equation requires 5 statesIndex: beginning of (u,v,w), beginning of (ax, ay, az), p and rho and T");
@@ -73,16 +89,6 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         return (N*getElementState<dim>(element, m_statesIndex[3])).value();
     });
 
-    m_pMatBuilder->setMGammacomputeFactor([&](const Facet& facet,
-                                              const NmatTypeLD<dim>& N) -> double {
-        Eigen::Matrix<double, dim, 1> curvatures;
-        for(unsigned short i = 0 ; i < dim ; ++i)
-        {
-            curvatures[i] = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(i));
-        }
-        return m_gamma*N*curvatures;
-    });
-
     m_pMatBuilder->setKcomputeFactor([&](const Element& /** element **/,
                                          const NmatTypeHD<dim>& /** N **/,
                                          const BmatType<dim>& /** B **/,
@@ -105,6 +111,24 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
             double T = (N*getElementState<dim>(element, m_statesIndex[4])).value();
             return rho*(1 - m_alpha*(T - m_Tr));
         });
+
+        m_pMatBuilder->setFSTcomputeFactor([&](const Facet& facet,
+                                               const NmatTypeLD<dim>& N,
+                                               const NmatTildeTypeLD<dim>&  /** Ntilde **/,
+                                               const GradNmatType<dim>& /** gradNe **/) -> double {
+            double T = (N*getFacetState<dim>(facet, m_statesIndex[4])).value();
+            return m_gamma + m_DgammaDT*(T - m_Tr);
+        });
+
+        if(m_phaseChange)
+        {
+            m_pMatBuilder2->setMcomputeFactor([&](const Element& element,
+                                                 const NmatTypeHD<dim>& N) -> double {
+                double T = (N*getElementState<dim>(element, m_statesIndex[4])).value();
+                double fl = m_getFl(T);
+                return m_C*(1 - fl)*(1 - fl)/(fl*fl*fl + m_eps);
+            });
+        }
     }
     else
     {
@@ -112,6 +136,13 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
                                              const NmatTypeHD<dim>&  N,
                                              const BmatType<dim>& /** B **/) -> double {
             return (N*getElementState<dim>(element, m_statesIndex[3])).value();
+        });
+
+        m_pMatBuilder->setFSTcomputeFactor([&](const Facet& /** facet **/,
+                                               const NmatTypeLD<dim>& /** N **/,
+                                               const NmatTildeTypeLD<dim>&  /** Ntilde **/,
+                                               const GradNmatType<dim>& /** gradNe **/) -> double {
+            return m_gamma;
         });
     }
 
@@ -171,6 +202,7 @@ bool MomEqWCompNewton<dim>::solve()
     m_accumalatedTimes["Update solutions"] += m_clock.end();
 
     m_buildSystem();
+
     m_clock.start();
     m_applyBC();
     m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
@@ -224,6 +256,14 @@ void MomEqWCompNewton<dim>::m_buildSystem()
         Eigen::Matrix<double, dim*nodPerEl, 1> Fe = m_pMatBuilder->getF(element, m_bodyForce, Be);
 
         FTote[elm] = -Ke*V + De.transpose()*P + Fe;
+
+        if(m_phaseChange)
+        {
+            std::cout << "coucou" << std::endl;
+            Eigen::Matrix<double, nodPerEl, nodPerEl> MeTemp2 = m_pMatBuilder2->getM(element);
+            Eigen::Matrix<double, dim*nodPerEl, dim*nodPerEl> Me2 = MatrixBuilder<dim>::diagBlock(MeTemp2);
+            FTote[elm] -= Me2*V;
+        }
     }
     Eigen::setNbThreads(m_pProblem->getThreadCount());
     m_accumalatedTimes["Compute triplets"] += m_clock.end();
@@ -272,36 +312,30 @@ void MomEqWCompNewton<dim>::m_applyBC()
 
         const Facet& facet = m_pMesh->getFacet(f);
 
-        bool onFS = true;
+        bool onFS = false;
         for(unsigned short n = 0 ; n < noPerFacet ; ++n)
         {
-            if(!facet.getNode(n).isOnFreeSurface())
+            if(facet.getNode(n).isOnFreeSurface())
             {
-                onFS = false;
+                onFS = true;
                 break;
             }
         }
         if(!onFS)
             continue;
 
-        auto MGamma_s = m_pMatBuilder->getMGamma(facet);
-        auto MGamma = MatrixBuilder<dim>::diagBlock(MGamma_s);
+        const Element& element = facet.getElement();
+        GradNmatType<dim> gradNe = m_pMatBuilder->getGradN(element);
+        BmatType<dim> Be = m_pMatBuilder->getB(gradNe);
 
-        Eigen::Matrix<double, dim*noPerFacet, 1> nVec;
-        for(uint8_t n = 0 ; n < noPerFacet; ++n)
-        {
-            std::array<double, 3> normal = m_pMesh->getBoundFSNormal(facet.getNodeIndex(n));
+        Eigen::Matrix<double, dim*(dim + 1), 1> FST = m_pMatBuilder->getFST(facet, gradNe, Be);
 
-            for(uint8_t d = 0 ; d < dim ; ++d)
-                nVec(n + d*noPerFacet) = normal[d];
-        }
-
-        Eigen::Matrix<double, dim*noPerFacet, 1> Ff = MGamma*nVec;
-
-        for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+        for(unsigned short n = 0 ; n < dim + 1 ; ++n)
         {
             for(unsigned short d = 0 ; d < dim ; ++d)
-                m_F(facet.getNodeIndex(i) + d*nodesCount) += Ff[d*noPerFacet + i];
+            {
+                m_F[element.getNodeIndex(n) + d*nodesCount] += FST[n + d*(dim + 1)];
+            }
         }
     }
 
@@ -325,7 +359,7 @@ void MomEqWCompNewton<dim>::m_applyBC()
         else if(node.isBound())
         {
 
-            if(node.getFlag(m_bcFlags[0]))
+            if(m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[0]))
             {
                 std::array<double, dim> result;
                 result = m_bcParams[threadIndex].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",
@@ -343,4 +377,11 @@ void MomEqWCompNewton<dim>::m_applyBC()
             }
         }
     }
+}
+
+template<unsigned short dim>
+double MomEqWCompNewton<dim>::m_getFl(double T)
+{
+    return -2/(m_DT*m_DT*m_DT)*T*T*T + 6*m_Tm/(m_DT*m_DT*m_DT)*T*T
+           + (3/(2*m_DT) - 6*m_Tm*m_Tm/(m_DT*m_DT*m_DT))*T + (0.5 - 1.5*m_Tm/m_DT + 2*m_Tm*m_Tm*m_Tm/(m_DT*m_DT*m_DT));
 }

@@ -22,27 +22,78 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         nGPLD = 3;
     }
     m_pMatBuilder = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
+    m_pMatBuilder2 = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
 
     m_k = m_materialParams[0].checkAndGet<double>("k");
     m_cv = m_materialParams[0].checkAndGet<double>("cv");
+    m_h = m_materialParams[0].checkAndGet<double>("h");
+    m_Tinf = m_materialParams[0].checkAndGet<double>("Tinf");
+    m_epsRad = m_materialParams[0].checkAndGet<double>("epsRad");
 
-    if(bcFlags.size() != 2)
-        throw std::runtime_error("the " + getID() + " equation require two flags for two possible boundary conditions!");
+    m_phaseChange = false;
+    if(m_materialParams[0].doesVarExist("Tm")  || m_materialParams[0].doesVarExist("C") ||
+       m_materialParams[0].doesVarExist("eps") || m_materialParams[0].doesVarExist("DT"))
+    {
+        m_phaseChange = true;
+
+        m_Tm = m_materialParams[0].doesVarExist("Tm");
+        m_DT = m_materialParams[0].doesVarExist("DT");
+    }
+
+    if(bcFlags.size() != 4)
+        throw std::runtime_error("the " + getID() + " equation require four flags for four possible boundary conditions!");
 
     if(statesIndex.size() != 2)
         throw std::runtime_error("the " + getID() + " equation require two states index describing the T and rho state !");
 
 
-    m_pMatBuilder->setMcomputeFactor([&](const Element& element,
-                                         const NmatTypeHD<dim>& N) -> double {
-        double rho = (N*getElementState<dim>(element, m_statesIndex[1])).value();
-        return m_cv*rho;
-    });
+    if(!m_phaseChange)
+    {
+        m_pMatBuilder->setMcomputeFactor([&](const Element& element,
+                                             const NmatTypeHD<dim>& N) -> double {
+            double rho = (N*getElementState<dim>(element, m_statesIndex[1])).value();
+            return m_cv*rho;
+        });
+    }
+    else
+    {
+        m_pMatBuilder->setMcomputeFactor([&](const Element& element,
+                                             const NmatTypeHD<dim>& N) -> double {
+            double rho = (N*getElementState<dim>(element, m_statesIndex[1])).value();
+            double T = (N*getElementState<dim>(element, m_statesIndex[0])).value();
+            return (m_cv + m_getDflDT(T))*rho;
+        });
+    }
 
     m_pMatBuilder->setLcomputeFactor([&](const Element& /** element **/,
                                          const NmatTypeHD<dim>& /** N **/,
                                          const BmatType<dim>& /** B **/) -> double {
         return m_k;
+    });
+
+    m_pMatBuilder->setQFunc([&](const Facet& facet, const std::array<double, 3>& gp) -> Eigen::Matrix<double, dim, 1> {
+        std::array<double, 3> pos = facet.getPosFromGP(gp);
+        std::vector<double> result;
+            result = m_bcParams[0].call<std::vector<double>>(m_pMesh->getNodeType(facet.getNodeIndex(0)) + "Q",
+                                                             pos,
+                                                             pos, //TO DO: fix
+                                                             m_pProblem->getCurrentSimTime() +
+                                                             m_pSolver->getTimeStep());
+
+        return Eigen::Matrix<double, dim, 1>::Map(result.data(), result.size());
+    });
+
+    m_pMatBuilder->setSGammacomputeFactor([&](const Facet& facet,
+                                              const NmatTypeLD<dim>& N) -> double {
+        double T = (N*getFacetState<dim>(facet, m_statesIndex[0])).value();
+        return m_h*(T - m_Tinf);
+    });
+
+    m_pMatBuilder2->setSGammacomputeFactor([&](const Facet& facet,
+                                               const NmatTypeLD<dim>& N) -> double {
+        double T = (N*getFacetState<dim>(facet, m_statesIndex[0])).value();
+        constexpr double sigma = 5.670374419e-8;
+        return sigma*m_epsRad*(T*T*T*T - m_Tinf*m_Tinf*m_Tinf*m_Tinf);
     });
 
     m_needNormalCurv = true;
@@ -97,24 +148,80 @@ void HeatEqWCompNewton<dim>::m_applyBC()
     auto& invMDiag = m_invM.diagonal();
 
     const std::size_t nodesCount = m_pMesh->getNodesCount();
-    //const std::size_t facetsCount = m_pMesh->getFacetsCount();
-    //constexpr unsigned short noPerFacet = dim;
+    const std::size_t facetsCount = m_pMesh->getFacetsCount();
+    constexpr std::size_t noPerFacet = dim;
+
+    for(std::size_t f = 0 ; f < facetsCount ; ++f)
+    {
+        const Facet& facet = m_pMesh->getFacet(f);
+        bool boundaryQ = true;
+        bool boundaryQh = true;
+        bool boundaryQr = true;
+        for(uint8_t n = 0 ; n < noPerFacet ; ++n)
+        {
+            const Node& node = facet.getNode(n);
+
+            if(!m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[1]))
+                boundaryQ = false;
+
+            if(!m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[2]))
+                boundaryQh = false;
+
+            if(!m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[3]))
+                boundaryQr = false;
+        }
+
+        if(!boundaryQ && !boundaryQh && !boundaryQr)
+            continue;
+
+        if(boundaryQ)
+        {
+            auto qn = m_pMatBuilder->getQN(facet);
+
+            for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+            {
+                m_F(facet.getNodeIndex(i)) -= qn[i];
+            }
+        }
+
+        if(boundaryQh)
+        {
+            auto SGammah = m_pMatBuilder->getSGamma(facet);
+
+            for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+            {
+                m_F(facet.getNodeIndex(i)) -= SGammah[i];
+            }
+        }
+
+        if(boundaryQr)
+        {
+            auto SGammar = m_pMatBuilder2->getSGamma(facet);
+
+            for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+            {
+                m_F(facet.getNodeIndex(i)) -= SGammar[i];
+            }
+        }
+
+    }
 
     //Do not parallelize this (lua)
     for (std::size_t n = 0 ; n < nodesCount ; ++n)
     {
         const Node& node = m_pMesh->getNode(n);
-        if(node.isFree())
+        if(node.isFree() && !m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[0]))
         {
             m_F(n) = node.getState(m_statesIndex[0]);
             invMDiag[n] = 1;
         }
-        else if(node.getFlag(m_bcFlags[0]))
+        else if(m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[0]))
         {
             std::array<double, 1> result;
             result = m_bcParams[0].call<std::array<double, 1>>(m_pMesh->getNodeType(n) + "T",
                                                              node.getPosition(),
                                                              m_pMesh->getBoundNodeInitPos(n),
+                                                             node.getStates(),
                                                              m_pProblem->getCurrentSimTime() +
                                                              m_pSolver->getTimeStep());
             m_F(n) = result[0];
@@ -175,4 +282,10 @@ void HeatEqWCompNewton<dim>::m_buildSystem()
 
     MatrixBuilder<dim>::inverse(m_invM);
     m_accumalatedTimes["Assemble matrix"] += m_clock.end();
+}
+
+template<unsigned short dim>
+double HeatEqWCompNewton<dim>::m_getDflDT(double T)
+{
+    return -2*3/(m_DT*m_DT*m_DT)*T*T + 6*2*m_Tm/(m_DT*m_DT*m_DT)*T + (3/(2*m_DT) - 6*m_Tm*m_Tm/(m_DT*m_DT*m_DT));
 }

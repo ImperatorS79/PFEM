@@ -951,14 +951,19 @@ bool Mesh::removeNodes(bool verboseOutput) noexcept
             }
             d = std::sqrt(d);
 
+            double fact = 1;
+
+            if(m_nodesList[i].m_isOnFreeSurface && m_nodesList[m_nodesList[i].m_neighbourNodes[j]].m_isOnFreeSurface)
+                fact = 0.5;
+
             //Two nodes are too close.
-            if(d <= limitLength)
+            if(d <= fact*limitLength)
             {
                 //If the neighbour nodes is touched, we delete the current nodes
                 if(touched[m_nodesList[i].m_neighbourNodes[j]])
                 {
                     //Do not delete bounded or free surface nodes
-                    if(m_nodesList[i].m_isBound || m_nodesList[i].m_isOnFreeSurface)
+                    if(m_nodesList[i].m_isBound || (m_nodesList[i].m_isOnFreeSurface && !m_nodesList[m_nodesList[i].m_neighbourNodes[j]].m_isOnFreeSurface))
                         continue;
 
                     toBeDeleted[i] = true;
@@ -969,7 +974,7 @@ bool Mesh::removeNodes(bool verboseOutput) noexcept
                 {
                     //Do not delete bounded or free surface nodes
                     if(m_nodesList[m_nodesList[i].m_neighbourNodes[j]].m_isBound ||
-                       m_nodesList[m_nodesList[i].m_neighbourNodes[j]].m_isOnFreeSurface)
+                       (m_nodesList[m_nodesList[i].m_neighbourNodes[j]].m_isOnFreeSurface && !m_nodesList[i].m_isOnFreeSurface))
                         continue;
 
                     touched[i] = true;
@@ -1029,9 +1034,11 @@ void Mesh::restoreNodesList()
         m_facetsList[facet].computeJ();
         m_facetsList[facet].computeDetJ();
         m_facetsList[facet].computeInvJ();
+        if(m_computeNormalCurvature)
+            m_facetsList[facet].computeNormal();
     }
 
-    computeFSNormalCurvature();
+    //computeFSNormalCurvature();
 }
 
 void Mesh::saveNodesList()
@@ -1081,9 +1088,11 @@ void Mesh::updateNodesPosition(const std::vector<double>& deltaPos)
         m_facetsList[facet].computeJ();
         m_facetsList[facet].computeDetJ();
         m_facetsList[facet].computeInvJ();
+        if(m_computeNormalCurvature)
+            m_facetsList[facet].computeNormal();
     }
 
-    computeFSNormalCurvature();
+    //computeFSNormalCurvature();
 }
 
 void Mesh::updateNodesPosition(const Eigen::VectorXd& deltaPos)
@@ -1117,9 +1126,11 @@ void Mesh::updateNodesPosition(const Eigen::VectorXd& deltaPos)
         m_facetsList[facet].computeJ();
         m_facetsList[facet].computeDetJ();
         m_facetsList[facet].computeInvJ();
+        if(m_computeNormalCurvature)
+            m_facetsList[facet].computeNormal();
     }
 
-    computeFSNormalCurvature();
+    //computeFSNormalCurvature();
 }
 
 void Mesh::updateNodesPosition(const Eigen::VectorXd& deltaPos,
@@ -1172,10 +1183,12 @@ void Mesh::updateNodesPosition(const Eigen::VectorXd& deltaPos,
         m_facetsList[*it].computeJ();
         m_facetsList[*it].computeDetJ();
         m_facetsList[*it].computeInvJ();
+        if(m_computeNormalCurvature)
+            m_facetsList[*it].computeNormal();
     }
 
     //To do: only update normal of facet that have been updated
-    computeFSNormalCurvature();
+    //computeFSNormalCurvature();
 }
 
 void Mesh::updateNodesPositionFromSave(const std::vector<double>& deltaPos)
@@ -1212,9 +1225,11 @@ void Mesh::updateNodesPositionFromSave(const std::vector<double>& deltaPos)
         m_facetsList[facet].computeJ();
         m_facetsList[facet].computeDetJ();
         m_facetsList[facet].computeInvJ();
+        if(m_computeNormalCurvature)
+            m_facetsList[facet].computeNormal();
     }
 
-    computeFSNormalCurvature();
+    //computeFSNormalCurvature();
 }
 
 void Mesh::updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos)
@@ -1251,9 +1266,11 @@ void Mesh::updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos)
         m_facetsList[facet].computeJ();
         m_facetsList[facet].computeDetJ();
         m_facetsList[facet].computeInvJ();
+        if(m_computeNormalCurvature)
+            m_facetsList[facet].computeNormal();
     }
 
-    computeFSNormalCurvature();
+    //computeFSNormalCurvature();
 }
 
 void Mesh::updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos,
@@ -1309,8 +1326,10 @@ void Mesh::updateNodesPositionFromSave(const Eigen::VectorXd& deltaPos,
         m_facetsList[*it].computeJ();
         m_facetsList[*it].computeDetJ();
         m_facetsList[*it].computeInvJ();
+        if(m_computeNormalCurvature)
+            m_facetsList[*it].computeNormal();
     }
 
     //To do: only update normal of facet that have been updated
-    computeFSNormalCurvature();
+    //computeFSNormalCurvature();
 }

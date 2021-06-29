@@ -27,15 +27,24 @@ class HeatEqWCompNewton : public Equation
 
     private:
         std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder;
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder2;
 
         double m_k;
         double m_cv;
+        double m_Tm;
+        double m_DT;
+        double m_h;
+        double m_Tinf;
+        double m_epsRad;
+        bool m_phaseChange;
 
         Eigen::DiagonalMatrix<double,Eigen::Dynamic> m_invM;
         Eigen::VectorXd m_F;
 
         void m_buildSystem();
         void m_applyBC();
+
+        double m_getDflDT(double T);
 };
 
 #include "HeatEquation.inl"

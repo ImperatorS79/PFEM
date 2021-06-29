@@ -5,8 +5,6 @@
 #include <functional>
 #include <Eigen/Dense>
 
-#include "../simulation_defines.h"
-
 class Element;
 class Facet;
 class Mesh;
@@ -14,7 +12,11 @@ class Mesh;
 template<unsigned short dim, unsigned short noPerEl = dim + 1>
 using NmatTypeHD = Eigen::Matrix<double, 1, noPerEl>;
 template<unsigned short dim, unsigned short noPerEl = dim + 1>
+using NmatTildeTypeHD = Eigen::Matrix<double, dim, dim*noPerEl>;
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
 using NmatTypeLD = Eigen::Matrix<double, 1, noPerEl - 1>;
+template<unsigned short dim, unsigned short noPerEl = dim + 1>
+using NmatTildeTypeLD = Eigen::Matrix<double, dim, dim*(noPerEl - 1)>;
 template<unsigned short dim, unsigned short noPerEl = dim + 1>
 using BmatType = Eigen::Matrix<double, dim*dim - 2*dim +3, dim*noPerEl>;
 template<unsigned short dim, unsigned short noPerEl = dim + 1>
@@ -33,7 +35,9 @@ class MatrixBuilder
 {
 
     using NmatTypeHD = Eigen::Matrix<double, 1, noPerEl>;
+    using NmatTildeTypeHD = Eigen::Matrix<double, dim, dim*noPerEl>;
     using NmatTypeLD = Eigen::Matrix<double, 1, noPerEl - 1>;
+    using NmatTildeTypeLD = Eigen::Matrix<double, dim, dim*(noPerEl - 1)>;
     using BmatType = Eigen::Matrix<double, dim*dim - 2*dim + 3, dim*(noPerEl)>;
     using GradNmatType = Eigen::Matrix<double, dim, noPerEl> ;
     using DdevMatType = Eigen::Matrix<double, dim*dim - 2*dim +3, dim*dim - 2*dim +3>;
@@ -42,6 +46,8 @@ class MatrixBuilder
     using matFuncKElm = std::function<double(const Element&, const NmatTypeHD&, const BmatType&, const DdevMatType&)>;
     using simpleMatFuncElm = std::function<double(const Element&, const NmatTypeHD&)>;
     using simpleMatFuncFacet = std::function<double(const Facet&, const NmatTypeLD&)>;
+    using matFuncFacet = std::function<double(const Facet&, const NmatTypeLD&,  const NmatTildeTypeLD&, const GradNmatType&)>;
+    using matVecFuncFacet = std::function<Eigen::Matrix<double, dim*dim - 2*dim + 3, 1>(const Facet&, const NmatTypeLD&,  const NmatTildeTypeLD&, const BmatType&)>;
     using qFuncFacet = std::function<Eigen::Matrix<double, dim, 1>(const Facet&, const std::array<double, 3>& /** gp **/)>;
 
 	public:
@@ -57,8 +63,12 @@ class MatrixBuilder
 		Eigen::Matrix<double, noPerEl, noPerEl>                 getL(const Element& element, const BmatType& B, const GradNmatType& gradN);
 		Eigen::Matrix<double, noPerEl, dim*noPerEl>             getC(const Element& element, const BmatType& B, const GradNmatType& gradN);
 		Eigen::Matrix<double, dim*noPerEl, 1>                   getF(const Element& element, const Eigen::Matrix<double, dim, 1>& vec, const BmatType& B);
+		Eigen::Matrix<double, noPerEl - 1, 1>                   getSGamma(const Facet& facet);
 		Eigen::Matrix<double, noPerEl, 1>                       getH(const Element& element, const Eigen::Matrix<double, dim, 1>& vec, const BmatType& B, const GradNmatType& gradN);
 		Eigen::Matrix<double, dim, 1>                           getQN(const Facet& facet);
+		Eigen::Matrix<double, dim*dim - 2*dim +3, 1>            getP(const Facet& facet);
+        Eigen::Matrix<double, dim*dim - 2*dim +3, dim*dim - 2*dim +3> getT(const Eigen::Matrix<double, dim*dim - 2*dim +3, 1>& P);
+        Eigen::Matrix<double, dim*noPerEl, 1>                   getFST(const Facet& facet, const GradNmatType& gradNe, const BmatType& Be);
 
 		void setddev(DdevMatType ddev);
 		void setm(mVecType m);
@@ -69,7 +79,9 @@ class MatrixBuilder
 		void setLcomputeFactor(matFuncElm computeFactor);
 		void setCcomputeFactor(matFuncElm computeFactor);
 		void setFcomputeFactor(matFuncElm computeFactor);
+		void setSGammacomputeFactor(simpleMatFuncFacet computeFactor);
 		void setHcomputeFactor(matFuncElm computeFactor);
+		void setFSTcomputeFactor(matFuncFacet computeFactor);
 		void setQFunc(qFuncFacet func);
 
 		template <unsigned short Size>
@@ -157,8 +169,8 @@ class MatrixBuilder
         std::vector<NmatTypeLD> m_NLD;
         std::vector<Eigen::Matrix<double, noPerEl - 1, noPerEl - 1>> m_NldTNld;
         Eigen::Matrix<double, noPerEl - 1, noPerEl - 1> m_sum_NldTNld_w;
-        std::vector<Eigen::Matrix<double, dim, dim*noPerEl>> m_NHDtilde;
-        std::vector<Eigen::Matrix<double, dim, dim*(noPerEl - 1)>> m_NLDtilde;
+        std::vector<NmatTildeTypeHD> m_NHDtilde;
+        std::vector<NmatTildeTypeLD> m_NLDtilde;
 
         DdevMatType m_ddev;
         mVecType m_m;
@@ -170,7 +182,9 @@ class MatrixBuilder
         matFuncElm m_Lfunc;
         matFuncElm m_Cfunc;
         matFuncElm m_Ffunc;
+        simpleMatFuncFacet m_SGammafunc;
         matFuncElm m_Hfunc;
+        matFuncFacet m_FSTfunc;
         qFuncFacet m_QFunc;
 };
 

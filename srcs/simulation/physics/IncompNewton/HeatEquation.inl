@@ -126,7 +126,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
 
     m_pPicardAlgo->runOnlyOnce(true); //When k, cv independant of T, no need of Picard
 
-    m_needNormalCurv = false; //hack
+    m_needNormalCurv = true;
 }
 
 template<unsigned short dim>
@@ -192,7 +192,7 @@ void HeatEqIncompNewton<dim>::m_buildAb(const Eigen::VectorXd& qPrev)
 
             for(unsigned short j = 0 ; j < noPerEl ; ++j)
             {
-                if(!ni.getFlag(m_bcFlags[0]))
+                if(!m_pSolver->getBcTagFlags(ni.getTag(), m_bcFlags[0]))
                 {
                     if(!ni.isFree())
                     {
@@ -231,7 +231,7 @@ void HeatEqIncompNewton<dim>::m_buildAb(const Eigen::VectorXd& qPrev)
     {
         const Node& node = m_pMesh->getNode(n);
 
-        if(node.getFlag(m_bcFlags[0]) || node.isFree())
+        if(m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[0]) || node.isFree())
         {
             indexA.push_back(Eigen::Triplet<double>(n, n, 1));
         }
@@ -262,7 +262,9 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
         bool boundaryQ = true;
         for(uint8_t n = 0 ; n < noPerFacet ; ++n)
         {
-            if(!m_pMesh->getNode(facet.getNodeIndex(n)).getFlag(m_bcFlags[1]))
+            const Node& node = facet.getNode(n);
+
+            if(!m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[1]))
             {
                 boundaryQ = false;
                 break;
@@ -283,16 +285,17 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
     for (std::size_t n = 0 ; n < nodesCount ; ++n)
     {
         const Node& node = m_pMesh->getNode(n);
-        if(node.isFree())
+        if(node.isFree() && !m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[0]))
         {
             m_b(n) = qPrev[n];
         }
-        else if(node.getFlag(m_bcFlags[0]))
+        else if(m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[0]))
         {
             std::array<double, 1> result;
             result = m_bcParams[0].call<std::array<double, 1>>(m_pMesh->getNodeType(n) + "T",
                                                              node.getPosition(),
                                                              m_pMesh->getBoundNodeInitPos(n),
+                                                             node.getStates(),
                                                              m_pProblem->getCurrentSimTime() +
                                                              m_pSolver->getTimeStep());
             m_b(n) = result[0];

@@ -39,9 +39,9 @@ m_pProblem(pProblem)
                 double beta = smoother.checkAndGet<double>("betaInit");
 
                 if(m_pMesh->getDim() == 2)
-                    m_pMeshSmoothers.push_back(std::make_unique<PSmoother<2>>(pProblem, *m_pMesh, 0, a, epsADRTol, beta));
+                    m_pMeshSmoothers.push_back(std::make_unique<PSmoother<2>>(pProblem, *m_pMesh, a, epsADRTol, beta));
                 else
-                    m_pMeshSmoothers.push_back(std::make_unique<PSmoother<3>>(pProblem, *m_pMesh, 0, a, epsADRTol, beta));
+                    m_pMeshSmoothers.push_back(std::make_unique<PSmoother<3>>(pProblem, *m_pMesh, a, epsADRTol, beta));
             }
             else if (kind == "GETMe")
             {
@@ -49,9 +49,9 @@ m_pProblem(pProblem)
                 double maxIter = smoother.checkAndGet<double>("maxIter");
 
                 if(m_pMesh->getDim() == 2)
-                    m_pMeshSmoothers.push_back(std::make_unique<GETMe<2>>(pProblem, *m_pMesh, 0, epsTol, maxIter));
+                    m_pMeshSmoothers.push_back(std::make_unique<GETMe<2>>(pProblem, *m_pMesh, maxIter, epsTol));
                 else
-                    m_pMeshSmoothers.push_back(std::make_unique<GETMe<3>>(pProblem, *m_pMesh, 0, epsTol, maxIter));
+                    m_pMeshSmoothers.push_back(std::make_unique<GETMe<3>>(pProblem, *m_pMesh, maxIter, epsTol));
             }
             else
                 throw std::runtime_error("unknown mesh smoother " + kind);

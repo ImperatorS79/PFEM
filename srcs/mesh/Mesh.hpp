@@ -160,13 +160,6 @@ class MESH_API Mesh
         inline void setComputeNormalCurvature(bool activate) noexcept;
 
         /**
-         * \brief Set the requested flag to true.
-         * \param nodeIndex The index of the node which will be tagged.
-         * \param flag The flag (0-7) that will be set.
-         */
-        inline void setNodeFlag(std::size_t nodeIndex, unsigned short flag) noexcept;
-
-        /**
          * \brief Set if the node is in a Dirichlet BC (i.e. a BC which we impose speed but do not move!).
          * \param nodeIndex The index of the node in the internal nodes list;
          * \param isFixed true if the node is in a Dirichlet BC, false otherwise;
