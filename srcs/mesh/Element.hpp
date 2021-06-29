@@ -96,6 +96,8 @@ class MESH_API Element
         /// \return The minimum distance between 2 nodes of the element.
         double getMinNodeDist() const noexcept;
 
+        std::array<double, 3> getMeanPos() const noexcept;
+
         /// \return The element incircle/insphere.
         double getRin() const noexcept;
 

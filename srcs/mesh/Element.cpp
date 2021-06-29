@@ -195,6 +195,34 @@ double Element::getMinNodeDist() const noexcept
     }
 }
 
+std::array<double, 3> Element::getMeanPos() const noexcept
+{
+    std::array<double, 3> meanPos = {0, 0, 0};
+    if(m_pMesh->getDim() == 2)
+    {
+        const Node& n0 = this->getNode(0);
+        const Node& n1 = this->getNode(1);
+        const Node& n2 = this->getNode(2);
+
+        meanPos[0] = (n0.getCoordinate(0) + n1.getCoordinate(0) + n2.getCoordinate(0))/3;
+        meanPos[1] = (n0.getCoordinate(1) + n1.getCoordinate(1) + n2.getCoordinate(1))/3;
+        meanPos[2] = (n0.getCoordinate(2) + n1.getCoordinate(2) + n2.getCoordinate(2))/3;
+    }
+    else
+    {
+        const Node& n0 = this->getNode(0);
+        const Node& n1 = this->getNode(1);
+        const Node& n2 = this->getNode(2);
+        const Node& n3 = this->getNode(3);
+
+        meanPos[0] = (n0.getCoordinate(0) + n1.getCoordinate(0) + n2.getCoordinate(0) + n3.getCoordinate(0))/4;
+        meanPos[1] = (n0.getCoordinate(1) + n1.getCoordinate(1) + n2.getCoordinate(1) + n3.getCoordinate(1))/4;
+        meanPos[2] = (n0.getCoordinate(2) + n1.getCoordinate(2) + n2.getCoordinate(2) + n3.getCoordinate(2))/4;
+    }
+
+    return meanPos;
+}
+
 double Element::getRin() const noexcept
 {
     if(m_pMesh->getDim() == 2)
