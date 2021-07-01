@@ -44,10 +44,10 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         {
             m_phaseChange = true;
 
-            m_C = m_materialParams[0].doesVarExist("C");
-            m_eps = m_materialParams[0].doesVarExist("eps");
-            m_Tm = m_materialParams[0].doesVarExist("Tm");
-            m_DT = m_materialParams[0].doesVarExist("DT");
+            m_C = m_materialParams[0].checkAndGet<double>("C");
+            m_eps = m_materialParams[0].checkAndGet<double>("eps");
+            m_Tm = m_materialParams[0].checkAndGet<double>("Tm");
+            m_DT = m_materialParams[0].checkAndGet<double>("DT");
         }
 
 
@@ -172,6 +172,12 @@ void MomEqWCompNewton<dim>::displayParams() const
         std::cout << " * Body force: (" << m_bodyForce[0] << ", " << m_bodyForce[1] << ")" << std::endl;
     else
         std::cout << " * Body force: (" << m_bodyForce[0] << ", " << m_bodyForce[1] << "," << m_bodyForce[2] << ")" << std::endl;
+
+    if(m_phaseChange)
+    {
+        std::cout << " * C: " << m_C << "\n"
+                  << " * eps: " << m_eps << std::endl;
+    }
 }
 
 template<unsigned short dim>
@@ -259,7 +265,6 @@ void MomEqWCompNewton<dim>::m_buildSystem()
 
         if(m_phaseChange)
         {
-            std::cout << "coucou" << std::endl;
             Eigen::Matrix<double, nodPerEl, nodPerEl> MeTemp2 = m_pMatBuilder2->getM(element);
             Eigen::Matrix<double, dim*nodPerEl, dim*nodPerEl> Me2 = MatrixBuilder<dim>::diagBlock(MeTemp2);
             FTote[elm] -= Me2*V;
@@ -303,24 +308,15 @@ void MomEqWCompNewton<dim>::m_applyBC()
 
     const std::size_t nodesCount = m_pMesh->getNodesCount();
     const std::size_t facetsCount = m_pMesh->getFacetsCount();
-    constexpr unsigned short noPerFacet = dim;
 
     for(std::size_t f = 0 ; f < facetsCount ; ++f)
     {
-        if(m_gamma < 1e-15)
+        if(m_gamma < 1e-15 && m_DgammaDT < 1e-15)
             continue;
 
         const Facet& facet = m_pMesh->getFacet(f);
 
-        bool onFS = false;
-        for(unsigned short n = 0 ; n < noPerFacet ; ++n)
-        {
-            if(facet.getNode(n).isOnFreeSurface())
-            {
-                onFS = true;
-                break;
-            }
-        }
+        bool onFS = facet.isOnFreeSurface();
         if(!onFS)
             continue;
 
@@ -364,8 +360,6 @@ void MomEqWCompNewton<dim>::m_applyBC()
                 std::array<double, dim> result;
                 result = m_bcParams[threadIndex].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",
                                                         node.getPosition(),
-                                                        m_pMesh->getBoundNodeInitPos(n),
-                                                        node.getStates(),
                                                         m_pProblem->getCurrentSimTime() +
                                                         m_pSolver->getTimeStep());
 
@@ -382,6 +376,6 @@ void MomEqWCompNewton<dim>::m_applyBC()
 template<unsigned short dim>
 double MomEqWCompNewton<dim>::m_getFl(double T)
 {
-    return -2/(m_DT*m_DT*m_DT)*T*T*T + 6*m_Tm/(m_DT*m_DT*m_DT)*T*T
-           + (3/(2*m_DT) - 6*m_Tm*m_Tm/(m_DT*m_DT*m_DT))*T + (0.5 - 1.5*m_Tm/m_DT + 2*m_Tm*m_Tm*m_Tm/(m_DT*m_DT*m_DT));
+    return static_cast<double>(T > m_Tm - m_DT/2)*static_cast<double>(T < m_Tm + m_DT/2)*(-2/(m_DT*m_DT*m_DT)*T*T*T + 6*m_Tm/(m_DT*m_DT*m_DT)*T*T
+           + (3/(2*m_DT) - 6*m_Tm*m_Tm/(m_DT*m_DT*m_DT))*T + (0.5 - 1.5*m_Tm/m_DT + 2*m_Tm*m_Tm*m_Tm/(m_DT*m_DT*m_DT))) + static_cast<double>(T > m_Tm + m_DT/2);
 }

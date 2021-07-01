@@ -35,21 +35,36 @@ class HeatEqIncompNewton : public Equation
         bool solve() override;
 
     private:
+        enum class Res
+        {
+            T,
+            Ax_f
+        };
+
         std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder; /**< Class responsible of building the required matrices. */
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder2; /**< Class responsible of building the required matrices. */
         std::unique_ptr<PicardAlgo> m_pPicardAlgo;
         Eigen::SparseMatrix<double> m_A;
         Eigen::VectorXd m_b;
         EigenSparseSolver m_solver;
         Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> m_solverIt;
 
+        Res m_residual;
         double m_k;
-        double m_cv;
         double m_rho;
+        double m_cv;
+        double m_Tm;
+        double m_Lm;
+        double m_DT;
+        double m_h;
+        double m_Tinf;
+        double m_epsRad;
+        bool m_phaseChange;
 
         void m_buildAb(const Eigen::VectorXd& qPrev);
         void m_applyBC(const Eigen::VectorXd& qPrev);
 
-        double m_computeTauPSPG(const Element& element) const;
+        double m_getDflDT(double T);
 };
 
 #include "HeatEquation.inl"

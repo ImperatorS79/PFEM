@@ -23,16 +23,30 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     }
 
     m_pMatBuilder = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
+    m_pMatBuilder2 = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
 
     m_rho = m_materialParams[0].checkAndGet<double>("rho");
     m_mu = m_materialParams[0].checkAndGet<double>("mu");
     m_gamma = m_materialParams[0].checkAndGet<double>("gamma");
+
+    m_phaseChange = false;
 
     if(m_pProblem->getID() == "Boussinesq")
     {
         m_alpha = m_materialParams[0].checkAndGet<double>("alpha");
         m_Tr = m_materialParams[0].checkAndGet<double>("Tr");
         m_DgammaDT = m_materialParams[0].checkAndGet<double>("DgammaDT");
+
+        if(m_materialParams[0].doesVarExist("Tm")  || m_materialParams[0].doesVarExist("C") ||
+           m_materialParams[0].doesVarExist("eps") || m_materialParams[0].doesVarExist("DT"))
+        {
+            m_phaseChange = true;
+
+            m_C = m_materialParams[0].doesVarExist("C");
+            m_eps = m_materialParams[0].doesVarExist("eps");
+            m_Tm = m_materialParams[0].doesVarExist("Tm");
+            m_DT = m_materialParams[0].doesVarExist("DT");
+        }
 
         if(statesIndex.size() != 2)
             throw std::runtime_error("the " + getID() + " equation require two statesIndex describing the beginning of the states span and the temperature state!");
@@ -84,16 +98,6 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
                                          const NmatTypeHD<dim>& /** N **/) -> double {
         return m_rho;
     });
-
-//    m_pMatBuilder->setMGammacomputeFactor([&](const Facet& facet,
-//                                              const NmatTypeLD<dim>& N) -> double {
-//        Eigen::Matrix<double, dim, 1> curvatures;
-//        for(unsigned short i = 0 ; i < dim ; ++i)
-//        {
-//            curvatures[i] = m_pMesh->getFreeSurfaceCurvature(facet.getNodeIndex(i));
-//        }
-//        return m_gamma*N*curvatures;
-//    });
 
     if(m_pProblem->getID() == "Bingham")
     {
@@ -174,6 +178,16 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
             return m_gamma + m_DgammaDT*(T - m_Tr);
         });
 
+        if(m_phaseChange)
+        {
+            m_pMatBuilder2->setMcomputeFactor([&](const Element& element,
+                                                  const NmatTypeHD<dim>& N) -> double {
+                double T = (N*getElementState<dim>(element, m_statesIndex[1])).value();
+                double fl = m_getFl(T);
+                return m_C*(1 - fl)*(1 - fl)/(fl*fl*fl + m_eps);
+            });
+        }
+
         if(m_pSolver->getID() == "PSPG")
         {
             m_pMatBuilder->setHcomputeFactor([&](const Element& element,
@@ -211,7 +225,16 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
 
     unsigned int maxIter = m_equationParams[0].checkAndGet<unsigned int>("maxIter");
     double minRes = m_equationParams[0].checkAndGet<double>("minRes");
-    m_computePres = m_equationParams[0].checkAndGet<bool>("computePres");
+    std::string residual = m_equationParams[0].checkAndGet<std::string>("residual");
+    if(residual == "U")
+        m_residual = Res::U;
+    else if(residual == "U_P")
+        m_residual = Res::U_P;
+    else if(residual == "Ax_f")
+        m_residual = Res::Ax_f;
+    else
+        throw std::runtime_error("unknown residual type: " + residual);
+
 
     auto bodyForce = m_equationParams[0].checkAndGet<std::vector<double>>("bodyForce");
     if(bodyForce.size() != m_pMesh->getDim())
@@ -283,4 +306,11 @@ bool MomContEqIncompNewton<dim>::solve()
     }
 
     return false;
+}
+
+template<unsigned short dim>
+double MomContEqIncompNewton<dim>::m_getFl(double T)
+{
+    return static_cast<double>(T > m_Tm - m_DT/2)*static_cast<double>(T < m_Tm + m_DT/2)*(-2/(m_DT*m_DT*m_DT)*T*T*T + 6*m_Tm/(m_DT*m_DT*m_DT)*T*T
+           + (3/(2*m_DT) - 6*m_Tm*m_Tm/(m_DT*m_DT*m_DT))*T + (0.5 - 1.5*m_Tm/m_DT + 2*m_Tm*m_Tm*m_Tm/(m_DT*m_DT*m_DT))) + static_cast<double>(T > m_Tm + m_DT/2);
 }

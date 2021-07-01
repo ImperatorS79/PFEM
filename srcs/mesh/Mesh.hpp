@@ -28,6 +28,7 @@ struct MeshCreateInfo
     std::string mshFile = {}; /**< The path to the .msh file to load */
     bool addOnFS = true;
     bool deleteFlyingNodes = false;
+    bool laplacianSmoothingBoundaries = false;
 };
 
 /**
@@ -58,10 +59,6 @@ class MESH_API Mesh
         void displayToConsole() const noexcept;
 
         void deleteFlyingNodes(bool verboseOutput) noexcept;
-
-        /// \param nodeIndex The index of the boundary node in the nodes list.
-        /// \return The initial position of the node.
-        inline std::array<double, 3> getBoundNodeInitPos(std::size_t nodeIndex) const;
 
         /// \return The mesh dimension.
         inline unsigned short getDim() const noexcept;
@@ -205,6 +202,7 @@ class MESH_API Mesh
         std::vector<std::vector<double>> m_exclusionZones;
         bool m_addOnFS;
         bool m_deleteFlyingNodes;
+        bool m_laplacianSmoothingBoundaries;
 
         bool m_computeNormalCurvature;      /**< Control if mesh update should compute normals and curvatures of free surface. */
 
@@ -216,7 +214,6 @@ class MESH_API Mesh
         std::vector<Facet> m_facetsList;        /**< The list of boundary facets. */
 
         std::vector<std::string> m_tagNames; /**< The name of the tag of the nodes. */
-        std::map<std::size_t, std::array<double, 3>> m_boundaryInitialPos;  /**< Initial position of node at the boundary. */
         std::map<std::size_t, std::array<double, 3>> m_boundFSNormal;   /**< Free surface and boundary normals normals */
         std::map<std::size_t, double> m_freeSurfaceCurvature;               /**< Free surface curvatures */
 

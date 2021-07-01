@@ -43,7 +43,14 @@ void MomContEqIncompNewton<dim>::m_buildAbPSPG(const Eigen::VectorXd& qPrev)
 
         Eigen::Matrix<double, dim*nodPerEl, 1> vPrev = getElementVecState<dim>(qPrev, element, 0, nNodes);
 
-        be << Fe + Me_dt*vPrev, He + Ce_dt*vPrev;
+        if(m_phaseChange)
+        {
+            Eigen::Matrix<double, nodPerEl, nodPerEl> Me2_s = m_pMatBuilder2->getM(element);
+            Eigen::Matrix<double, dim*nodPerEl, dim*nodPerEl> Me2 = MatrixBuilder<dim>::diagBlock(Me2_s);
+            be << Fe + Me_dt*vPrev - Me2*vPrev, He + Ce_dt*vPrev;
+        }
+        else
+            be << Fe + Me_dt*vPrev, He + Ce_dt*vPrev;
 
         std::size_t countA = 0;
         std::size_t countb = 0;
@@ -93,6 +100,7 @@ void MomContEqIncompNewton<dim>::m_buildAbPSPG(const Eigen::VectorXd& qPrev)
     Eigen::setNbThreads(m_pProblem->getThreadCount());
     m_accumalatedTimes["Compute triplets"] += m_clock.end();
 
+
     //Best would be to know the number of nodes in which case :/
     //This can still be fasten using OpenMP but will never be as good as using []
     //with preallocated memory
@@ -120,6 +128,7 @@ void MomContEqIncompNewton<dim>::m_buildAbPSPG(const Eigen::VectorXd& qPrev)
     }
     m_accumalatedTimes["Push back (n, n, 1)"] += m_clock.end();
 
+
     /********************************************************************************
                                         Compute A and b
     ********************************************************************************/
@@ -145,7 +154,7 @@ void MomContEqIncompNewton<dim>::m_applyBCPSPG(const Eigen::VectorXd& qPrev)
 
     for(std::size_t f = 0 ; f < facetsCount ; ++f)
     {
-        if(m_gamma < 1e-15)
+        if(m_gamma < 1e-15 && m_DgammaDT < 1e-15)
             continue;
 
         const Facet& facet = m_pMesh->getFacet(f);
@@ -201,8 +210,6 @@ void MomContEqIncompNewton<dim>::m_applyBCPSPG(const Eigen::VectorXd& qPrev)
                 std::array<double, dim> result;
                 result = m_bcParams[0].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",
                                                         node.getPosition(),
-                                                        m_pMesh->getBoundNodeInitPos(n),
-                                                        node.getStates(),
                                                         m_pProblem->getCurrentSimTime() +
                                                         m_pSolver->getTimeStep());
 
@@ -262,12 +269,13 @@ void MomContEqIncompNewton<dim>::m_setupPicardPSPG(unsigned int maxIter, double 
         m_clock.start();
         m_pMesh->saveNodesList();
         m_accumalatedTimes["Save/restore nodelist"] += m_clock.end();
-    },
-    [&](auto& qIterVec, const auto& qPrevVec){
+
         m_buildAbPSPG(qPrevVec[0]);
         m_clock.start();
         m_applyBCPSPG(qPrevVec[0]);
         m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
+    },
+    [&](auto& qIterVec, const auto& qPrevVec){
 
         m_clock.start();
         m_solver.analyzePattern(m_A);
@@ -286,6 +294,11 @@ void MomContEqIncompNewton<dim>::m_setupPicardPSPG(unsigned int maxIter, double 
             Eigen::VectorXd deltaPos = qIterVec[0]*m_pSolver->getTimeStep();
             m_pMesh->updateNodesPositionFromSave(deltaPos);
             m_accumalatedTimes["Update solutions"] += m_clock.end();
+
+            m_buildAbPSPG(qPrevVec[0]);
+            m_clock.start();
+            m_applyBCPSPG(qPrevVec[0]);
+            m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
             return true;
         }
         else
@@ -302,50 +315,66 @@ void MomContEqIncompNewton<dim>::m_setupPicardPSPG(unsigned int maxIter, double 
         m_clock.start();
         Mesh* p_Mesh = this->m_pMesh;
         const std::size_t nNodes = p_Mesh->getNodesCount();
-        double resV = 0, resP = 0;
 
-        double num = 0, den = 0;
-        for(std::size_t n = 0 ; n < nNodes ; ++n)
+        if(m_residual != Res::Ax_f)
         {
-            const Node& node = p_Mesh->getNode(n);
+            double resV = 0, resP = 0;
 
-            if(!node.isFree())
-            {
-                for(unsigned short d = 0 ; d < dim ; ++d)
-                {
-                    num += (qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes))*(qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes));
-                    den += qIterPrevVec[0](n + d*nNodes)*qIterPrevVec[0](n + d*nNodes);
-                }
-            }
-        }
-
-        if(den == 0)
-            resV = std::numeric_limits<double>::max();
-        else
-            resV = std::sqrt(num/den);
-
-        if(m_computePres)
-        {
-            num = 0, den = 0;
+            double num = 0, den = 0;
             for(std::size_t n = 0 ; n < nNodes ; ++n)
             {
                 const Node& node = p_Mesh->getNode(n);
 
                 if(!node.isFree())
                 {
-                    num += (qIterVec[0](n + dim*nNodes) - qIterPrevVec[0](n + dim*nNodes))*(qIterVec[0](n + dim*nNodes) - qIterPrevVec[0](n + dim*nNodes));
-                    den += qIterPrevVec[0](n + dim*nNodes)*qIterPrevVec[0](n + dim*nNodes);
+                    for(unsigned short d = 0 ; d < dim ; ++d)
+                    {
+                        num += (qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes))*(qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes));
+                        den += qIterPrevVec[0](n + d*nNodes)*qIterPrevVec[0](n + d*nNodes);
+                    }
                 }
             }
 
             if(den == 0)
-                resP = std::numeric_limits<double>::max();
+                resV = std::numeric_limits<double>::max();
+            else if(den < 1e-15 && num < 1e-15)
+                resV = 0;
             else
-                resP = std::sqrt(num/den);
+            {
+                if(den < 0.001*m_pMesh->getHchar()/m_pSolver->getTimeStep())
+                    resV = std::sqrt(num);
+                else
+                    resV = std::sqrt(num/den);
+            }
+
+            if(m_residual == Res::U_P)
+            {
+                num = 0, den = 0;
+                for(std::size_t n = 0 ; n < nNodes ; ++n)
+                {
+                    const Node& node = p_Mesh->getNode(n);
+
+                    if(!node.isFree())
+                    {
+                        num += (qIterVec[0](n + dim*nNodes) - qIterPrevVec[0](n + dim*nNodes))*(qIterVec[0](n + dim*nNodes) - qIterPrevVec[0](n + dim*nNodes));
+                        den += qIterPrevVec[0](n + dim*nNodes)*qIterPrevVec[0](n + dim*nNodes);
+                    }
+                }
+
+                if(den == 0)
+                    resP = std::numeric_limits<double>::max();
+                else
+                    resP = std::sqrt(num/den);
+            }
+
+            m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
+            return std::max(resV, resP);
         }
-
-        m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
-
-        return std::max(resV, resP);
+        else
+        {
+            double res = (m_A*qIterVec[0] - m_b).norm();
+            m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
+            return res;
+        }
     }, maxIter, minRes);
 }

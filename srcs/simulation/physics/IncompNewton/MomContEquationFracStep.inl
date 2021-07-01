@@ -10,7 +10,9 @@ void MomContEqIncompNewton<dim>::m_buildMatFracStep(const std::vector<Eigen::Vec
     m_clock.start();
     constexpr unsigned short nodPerEl = dim + 1;
     constexpr unsigned int tripletPerElmM = (dim*nodPerEl*nodPerEl);
-    constexpr unsigned int tripletPerElmMKDT = (dim*nodPerEl*nodPerEl + dim*nodPerEl*dim*nodPerEl);
+    unsigned int tripletPerElmMKDT = (dim*nodPerEl*nodPerEl + dim*nodPerEl*dim*nodPerEl);
+    if(m_phaseChange)
+        tripletPerElmMKDT += dim*nodPerEl*nodPerEl;
     constexpr unsigned int tripletPerElmDtL = (nodPerEl*nodPerEl);
     constexpr unsigned int doubletPerElm = (3*dim*nodPerEl);
 
@@ -43,6 +45,14 @@ void MomContEqIncompNewton<dim>::m_buildMatFracStep(const std::vector<Eigen::Vec
         m_DTelm[elm] = m_pMatBuilder->getD(element, Be).transpose();
         m_Lelm[elm] = m_pMatBuilder->getL(element, Be, gradNe);
         auto Fe = m_pMatBuilder->getF(element, m_bodyForce, Be);
+
+        Eigen::Matrix<double, dim*nodPerEl, dim*nodPerEl> Me2;
+
+        if(m_phaseChange)
+        {
+            Eigen::Matrix<double, nodPerEl, nodPerEl> Me2_s = m_pMatBuilder2->getM(element);
+            Me2 = MatrixBuilder<dim>::diagBlock(Me2_s);
+        }
 
         auto vPrev = getElementVecState<dim>(qPrev[0], element, 0, nNodes);
         auto pPrev = getElementState<dim>(qPrev[1], element, 0, nNodes);
@@ -77,6 +87,15 @@ void MomContEqIncompNewton<dim>::m_buildMatFracStep(const std::vector<Eigen::Vec
                             Eigen::Triplet<double>(element.getNodeIndex(i) + d*nNodes,
                                                    element.getNodeIndex(j) + d*nNodes,
                                                    Me_dt(i + d*nodPerEl, j + d*nodPerEl));
+
+                        if(m_phaseChange)
+                        {
+                            countMK_dt++;
+                            indexMK_dt[tripletPerElmMKDT*elm + countMK_dt] =
+                                Eigen::Triplet<double>(element.getNodeIndex(i) + d*nNodes,
+                                                       element.getNodeIndex(j) + d*nNodes,
+                                                       Me2(i + d*nodPerEl, j + d*nodPerEl));
+                        }
                     }
 
                     countM++;
@@ -102,7 +121,7 @@ void MomContEqIncompNewton<dim>::m_buildMatFracStep(const std::vector<Eigen::Vec
                 /********************************************************************
                                             Build L
                 ********************************************************************/
-                if(!ni.isFree() && !ni.isOnFreeSurface())
+                if(!ni.isFree())
                 {
                     indexL[tripletPerElmDtL*elm + countL] =
                         Eigen::Triplet<double>(element.getNodeIndex(i),
@@ -142,7 +161,7 @@ void MomContEqIncompNewton<dim>::m_buildMatFracStep(const std::vector<Eigen::Vec
     {
         const Node& node = m_pMesh->getNode(n);
 
-        if(node.isFree() || node.isOnFreeSurface())
+        if(node.isFree())
         {
             indexL.push_back(Eigen::Triplet<double>(n, n, 1));
         }
@@ -188,7 +207,7 @@ void MomContEqIncompNewton<dim>::m_applyBCVAppStep(const Eigen::VectorXd& qPrev)
     const std::size_t facetsCount = m_pMesh->getFacetsCount();
     constexpr unsigned short noPerFacet = dim;
 
-    if(m_gamma < 1e-15)
+    if(m_gamma < 1e-15 && m_DgammaDT < 1e-15)
         goto applyBC; //Heresy ^^
 
     for(std::size_t f = 0 ; f < facetsCount ; ++f)
@@ -245,8 +264,6 @@ void MomContEqIncompNewton<dim>::m_applyBCVAppStep(const Eigen::VectorXd& qPrev)
                 std::array<double, dim> result; //TO do: try to change that
                 result = m_bcParams[0].call<std::array<double, dim>>(m_pMesh->getNodeType(n) + "V",
                                                         node.getPosition(),
-                                                        m_pMesh->getBoundNodeInitPos(n),
-                                                        node.getStates(),
                                                         m_pProblem->getCurrentSimTime() +
                                                         m_pSolver->getTimeStep());
 
@@ -337,7 +354,7 @@ void MomContEqIncompNewton<dim>::m_applyBCPCorrStep()
     for (std::size_t n = 0 ; n < nodesCount ; ++n)
     {
         const Node& node = m_pMesh->getNode(n);
-        if(node.isFree() || node.isOnFreeSurface())
+        if(node.isFree())
         {
             m_bPcorrStep[n] = 0;
 
@@ -556,50 +573,58 @@ void MomContEqIncompNewton<dim>::m_setupPicardFracStep(unsigned int maxIter, dou
         m_clock.start();
         Mesh* p_Mesh = this->m_pMesh;
         const std::size_t nNodes = p_Mesh->getNodesCount();
-        double resV = 0, resP = 0;
 
-        double num = 0, den = 0;
-        for(std::size_t n = 0 ; n < nNodes ; ++n)
+        if(m_residual != Res::Ax_f)
         {
-            const Node& node = p_Mesh->getNode(n);
+            double resV = 0, resP = 0;
 
-            if(!node.isFree())
-            {
-                for(unsigned short d = 0 ; d < dim ; ++d)
-                {
-                    num += (qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes))*(qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes));
-                    den += qIterPrevVec[0](n + d*nNodes)*qIterPrevVec[0](n + d*nNodes);
-                }
-            }
-        }
-
-        if(den == 0)
-            resV = std::numeric_limits<double>::max();
-        else
-            resV = std::sqrt(num/den);
-
-        if(m_computePres)
-        {
-            num = 0, den = 0;
+            double num = 0, den = 0;
             for(std::size_t n = 0 ; n < nNodes ; ++n)
             {
                 const Node& node = p_Mesh->getNode(n);
 
                 if(!node.isFree())
                 {
-                    num += (qIterVec[1](n) - qIterPrevVec[1](n))*(qIterVec[1](n) - qIterPrevVec[1](n));
-                    den += qIterPrevVec[1](n)*qIterPrevVec[1](n);
+                    for(unsigned short d = 0 ; d < dim ; ++d)
+                    {
+                        num += (qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes))*(qIterVec[0](n + d*nNodes) - qIterPrevVec[0](n + d*nNodes));
+                        den += qIterPrevVec[0](n + d*nNodes)*qIterPrevVec[0](n + d*nNodes);
+                    }
                 }
             }
 
             if(den == 0)
-                resP = std::numeric_limits<double>::max();
+                resV = std::numeric_limits<double>::max();
             else
-                resP = std::sqrt(num/den);
+                resV = std::sqrt(num/den);
+
+            if(m_residual == Res::U_P)
+            {
+                num = 0, den = 0;
+                for(std::size_t n = 0 ; n < nNodes ; ++n)
+                {
+                    const Node& node = p_Mesh->getNode(n);
+
+                    if(!node.isFree())
+                    {
+                        num += (qIterVec[1](n) - qIterPrevVec[1](n))*(qIterVec[1](n) - qIterPrevVec[1](n));
+                        den += qIterPrevVec[1](n)*qIterPrevVec[1](n);
+                    }
+                }
+
+                if(den == 0)
+                    resP = std::numeric_limits<double>::max();
+                else
+                    resP = std::sqrt(num/den);
+            }
+
+            m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
+
+            return std::max(resV, resP);
         }
-
-        m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
-
-        return std::max(resV, resP);
+        else
+        {
+            throw std::runtime_error("Ax-f residual currently unsupported for fractionnal step solveur");
+        }
     }, maxIter, minRes);
 }

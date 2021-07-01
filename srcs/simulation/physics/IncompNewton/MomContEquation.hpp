@@ -35,11 +35,19 @@ class MomContEqIncompNewton : public Equation
         bool solve() override;
 
     private:
+        enum class Res
+        {
+            U,
+            U_P,
+            Ax_f
+        };
+
         std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder; /**< Class responsible of building the required matrices. */
+        std::unique_ptr<MatrixBuilder<dim>> m_pMatBuilder2; /**< Class responsible of building the required matrices. */
         std::unique_ptr<PicardAlgo> m_pPicardAlgo;
         EigenSparseSolver m_solver;
         Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> m_solverIt;
-        bool m_computePres;
+        Res m_residual;
 
         double m_rho;
         double m_mu;
@@ -49,6 +57,12 @@ class MomContEqIncompNewton : public Equation
         double m_Tr;
         double m_tau0;
         double m_mReg;
+
+        bool m_phaseChange;
+        double m_C;
+        double m_eps;
+        double m_Tm;
+        double m_DT;
 
         Eigen::Matrix<double, dim, 1> m_bodyForce;
 
@@ -83,8 +97,7 @@ class MomContEqIncompNewton : public Equation
         void m_applyBCVStep();
 
         double m_computeTauPSPG(const Element& element) const;
-
-
+        double m_getFl(double T);
 };
 
 #include "MomContEquation.inl"

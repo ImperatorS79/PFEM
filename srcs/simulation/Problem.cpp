@@ -65,7 +65,8 @@ m_step(0)
         mesh.checkAndGet<std::vector<std::vector<double>>>("exclusionZones"),
         mesh.checkAndGet<std::string>("mshFile"),
         mesh.checkAndGet<bool>("addOnFS"),
-        mesh.checkAndGet<bool>("deleteFlyingNodes")
+        mesh.checkAndGet<bool>("deleteFlyingNodes"),
+        mesh.checkAndGet<bool>("laplacianSmoothingBoundaries")
     };
 
     std::cout << "Loading the mesh" << std::flush;

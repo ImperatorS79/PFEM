@@ -94,6 +94,8 @@ class MESH_API Facet
 
         inline std::array<double, 3> getNormal() const noexcept;
 
+        bool isOnFreeSurface() const noexcept;
+
         friend inline bool operator==(const Facet& a, const Facet& b) noexcept;
 
         Facet& operator=(const Facet& facet)   = default;

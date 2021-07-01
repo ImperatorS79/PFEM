@@ -33,6 +33,7 @@ class HeatEqWCompNewton : public Equation
         double m_cv;
         double m_Tm;
         double m_DT;
+        double m_Lm;
         double m_h;
         double m_Tinf;
         double m_epsRad;

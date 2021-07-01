@@ -22,10 +22,26 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         nGPLD = 3;
     }
     m_pMatBuilder = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
+    m_pMatBuilder2 = std::make_unique<MatrixBuilder<dim>>(*pMesh, nGPHD, nGPLD);
 
-    m_rho = m_materialParams[0].checkAndGet<double>("rho");
     m_k = m_materialParams[0].checkAndGet<double>("k");
+    m_rho = m_materialParams[0].checkAndGet<double>("rho");
     m_cv = m_materialParams[0].checkAndGet<double>("cv");
+    m_h = m_materialParams[0].checkAndGet<double>("h");
+    m_Tinf = m_materialParams[0].checkAndGet<double>("Tinf");
+    m_epsRad = m_materialParams[0].checkAndGet<double>("epsRad");
+
+    m_phaseChange = false;
+    if(m_materialParams[0].doesVarExist("Tm")  || m_materialParams[0].doesVarExist("C") ||
+       m_materialParams[0].doesVarExist("eps") || m_materialParams[0].doesVarExist("DT") ||
+       m_materialParams[0].doesVarExist("Lm"))
+    {
+        m_phaseChange = true;
+
+        m_Tm = m_materialParams[0].checkAndGet<double>("Tm");
+        m_DT = m_materialParams[0].checkAndGet<double>("DT");
+        m_Lm = m_materialParams[0].checkAndGet<double>("Lm");
+    }
 
     if(bcFlags.size() != 2)
         throw std::runtime_error("the " + getID() + " equation require two flags for two possible boundary conditiosn!");
@@ -33,10 +49,21 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     if(statesIndex.size() != 1)
         throw std::runtime_error("the " + getID() + " equation require one state index describing the T state !");
 
-    m_pMatBuilder->setMcomputeFactor([&](const Element& /** element **/,
-                                         const NmatTypeHD<dim>& /** N **/) -> double {
-        return m_rho*m_cv;
-    });
+    if(!m_phaseChange)
+    {
+        m_pMatBuilder->setMcomputeFactor([&](const Element& /** element **/,
+                                             const NmatTypeHD<dim>& /** N **/) -> double {
+            return m_cv*m_rho;
+        });
+    }
+    else
+    {
+        m_pMatBuilder->setMcomputeFactor([&](const Element& element,
+                                             const NmatTypeHD<dim>& N) -> double {
+            double T = (N*getElementState<dim>(element, m_statesIndex[0])).value();
+            return (m_cv + m_getDflDT(T)*m_Lm)*m_rho;
+        });
+    }
 
     m_pMatBuilder->setLcomputeFactor([&](const Element& /** element **/,
                                          const NmatTypeHD<dim>& /** N **/,
@@ -46,18 +73,40 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
 
     m_pMatBuilder->setQFunc([&](const Facet& facet, const std::array<double, 3>& gp) -> Eigen::Matrix<double, dim, 1> {
         std::array<double, 3> pos = facet.getPosFromGP(gp);
-        std::vector<double> result;
-            result = m_bcParams[0].call<std::vector<double>>(m_pMesh->getNodeType(facet.getNodeIndex(0)) + "Q",
+
+        std::string nodeType = facet.isOnFreeSurface() ? "FreeSurface" : m_pMesh->getNodeType(facet.getNodeIndex(0));
+
+        std::array<double, dim> result;
+            result = m_bcParams[0].call<std::array<double, dim>>(nodeType + "Q",
                                                              pos,
-                                                             pos, //TO DO: fix
                                                              m_pProblem->getCurrentSimTime() +
                                                              m_pSolver->getTimeStep());
 
         return Eigen::Matrix<double, dim, 1>::Map(result.data(), result.size());
     });
 
+    m_pMatBuilder->setSGammacomputeFactor([&](const Facet& facet,
+                                              const NmatTypeLD<dim>& N) -> double {
+        double T = (N*getFacetState<dim>(facet, m_statesIndex[0])).value();
+        return m_h*(T - m_Tinf);
+    });
+
+    m_pMatBuilder2->setSGammacomputeFactor([&](const Facet& facet,
+                                               const NmatTypeLD<dim>& N) -> double {
+        double T = (N*getFacetState<dim>(facet, m_statesIndex[0])).value();
+        constexpr double sigma = 5.670374419e-8;
+        return sigma*m_epsRad*(T*T*T*T - m_Tinf*m_Tinf*m_Tinf*m_Tinf);
+    });
+
     unsigned int maxIter = m_equationParams[0].checkAndGet<unsigned int>("maxIter");
     double minRes = m_equationParams[0].checkAndGet<double>("minRes");
+    std::string residual = m_equationParams[0].checkAndGet<std::string>("residual");
+    if(residual == "T")
+        m_residual = Res::T;
+    else if(residual == "Ax_f")
+        m_residual = Res::Ax_f;
+    else
+        throw std::runtime_error("unknown residual type: " + residual);
 
     m_pPicardAlgo = std::make_unique<PicardAlgo>([&](const auto& qPrevVec){
         m_clock.start();
@@ -68,13 +117,14 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         m_clock.start();
         m_pMesh->saveNodesList();
         m_accumalatedTimes["Save/restore nodeslist"] += m_clock.end();
-    },
-    [&](auto& qIterVec, const auto& qPrevVec){
+
         m_buildAb(qPrevVec[0]);
 
         m_clock.start();
         m_applyBC(qPrevVec[0]);
         m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
+    },
+    [&](auto& qIterVec, const auto& qPrevVec){
         m_clock.start();
         m_solverIt.compute(m_A);
         m_accumalatedTimes["Compute matrix"] += m_clock.end();
@@ -87,6 +137,11 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
             m_clock.start();
             setNodesStatesfromQ(m_pMesh, qIterVec[0], m_statesIndex[0], m_statesIndex[0]);
             m_accumalatedTimes["Update solution"] += m_clock.end();
+            m_buildAb(qPrevVec[0]);
+
+            m_clock.start();
+            m_applyBC(qPrevVec[0]);
+            m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
             return true;
         }
         else
@@ -101,30 +156,39 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
     },
     [&](const auto& qIterVec, const auto& qIterPrevVec) -> double {
         m_clock.start();
-        double num = 0, den = 0;
         Mesh* p_Mesh = this->m_pMesh;
 
-        for(std::size_t n = 0 ; n < p_Mesh->getNodesCount() ; ++n)
+        if(m_residual == Res::T)
         {
-            const Node& node = p_Mesh->getNode(n);
-
-            if(!node.isFree())
+            double num = 0, den = 0;
+            for(std::size_t n = 0 ; n < p_Mesh->getNodesCount() ; ++n)
             {
-                num += (qIterVec[0](n) - qIterPrevVec[0](n))*(qIterVec[0](n) - qIterPrevVec[0](n));
-                den += qIterPrevVec[0](n)*qIterPrevVec[0](n);
+                const Node& node = p_Mesh->getNode(n);
+
+                if(!node.isFree())
+                {
+                    num += (qIterVec[0](n) - qIterPrevVec[0](n))*(qIterVec[0](n) - qIterPrevVec[0](n));
+                    den += qIterPrevVec[0](n)*qIterPrevVec[0](n);
+                }
             }
+
+            double res;
+            if(den == 0)
+                res = std::numeric_limits<double>::max();
+            else
+                res = std::sqrt(num/den);
+            m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
+            return res;
+        }
+        else
+        {
+            return(m_A*qIterVec[0] - m_b).norm();
         }
 
-        double res;
-        if(den == 0)
-            res = std::numeric_limits<double>::max();
-        else
-            res = std::sqrt(num/den);
-        m_accumalatedTimes["Compute Picard Algo residual"] += m_clock.end();
-        return res;
     }, maxIter, minRes);
 
-    m_pPicardAlgo->runOnlyOnce(true); //When k, cv independant of T, no need of Picard
+    if(!m_phaseChange)
+        m_pPicardAlgo->runOnlyOnce(true); //When k, cv independant of T, no need of Picard
 
     m_needNormalCurv = true;
 }
@@ -260,25 +324,60 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
     {
         const Facet& facet = m_pMesh->getFacet(f);
         bool boundaryQ = true;
+        bool boundaryQh = true;
+        bool boundaryQr = true;
+        bool fs = facet.isOnFreeSurface();
         for(uint8_t n = 0 ; n < noPerFacet ; ++n)
         {
             const Node& node = facet.getNode(n);
 
-            if(!m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[1]))
-            {
+            int tag = node.getTag();
+            if(fs)
+                tag = -2;
+
+            if(!m_pSolver->getBcTagFlags(tag, m_bcFlags[1]))
                 boundaryQ = false;
-                break;
-            }
+
+            if(!m_pSolver->getBcTagFlags(tag, m_bcFlags[2]))
+                boundaryQh = false;
+
+            if(!m_pSolver->getBcTagFlags(tag, m_bcFlags[3]))
+                boundaryQr = false;
         }
-        if(!boundaryQ)
+
+        if(!boundaryQ && !boundaryQh && !boundaryQr)
             continue;
 
-        auto qn = m_pMatBuilder->getQN(facet);
-
-        for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+        if(boundaryQ)
         {
-            m_b(facet.getNodeIndex(i)) -= qn[i]; //See Galerkin formulation
+            auto qn = m_pMatBuilder->getQN(facet);
+
+            for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+            {
+                m_b(facet.getNodeIndex(i)) -= qn[i];
+            }
         }
+
+        if(boundaryQh)
+        {
+            auto SGammah = m_pMatBuilder->getSGamma(facet);
+
+            for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+            {
+                m_b(facet.getNodeIndex(i)) -= SGammah[i];
+            }
+        }
+
+        if(boundaryQr)
+        {
+            auto SGammar = m_pMatBuilder2->getSGamma(facet);
+
+            for(unsigned short i = 0 ; i < noPerFacet ; ++i)
+            {
+                m_b(facet.getNodeIndex(i)) -= SGammar[i];
+            }
+        }
+
     }
 
     //Do not parallelize this (lua)
@@ -294,8 +393,6 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
             std::array<double, 1> result;
             result = m_bcParams[0].call<std::array<double, 1>>(m_pMesh->getNodeType(n) + "T",
                                                              node.getPosition(),
-                                                             m_pMesh->getBoundNodeInitPos(n),
-                                                             node.getStates(),
                                                              m_pProblem->getCurrentSimTime() +
                                                              m_pSolver->getTimeStep());
             m_b(n) = result[0];
@@ -313,4 +410,10 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
     }
 
     m_A.makeCompressed();
+}
+
+template<unsigned short dim>
+double HeatEqIncompNewton<dim>::m_getDflDT(double T)
+{
+    return static_cast<double>(T > m_Tm - m_DT/2)*static_cast<double>(T < m_Tm + m_DT/2)*(-2*3/(m_DT*m_DT*m_DT)*T*T + 6*2*m_Tm/(m_DT*m_DT*m_DT)*T + (3/(2*m_DT) - 6*m_Tm*m_Tm/(m_DT*m_DT*m_DT)));
 }

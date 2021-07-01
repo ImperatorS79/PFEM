@@ -7,19 +7,6 @@
 class Problem;
 class Mesh;
 
-enum class EqType
-{
-    Rho,
-    DRhoDt,
-    DPDt
-};
-
-enum class Stab
-{
-    None,
-    Meduri
-};
-
 template<unsigned short dim>
 class ContEqWCompNewton : public Equation
 {
@@ -40,6 +27,19 @@ class ContEqWCompNewton : public Equation
         void preCompute() override;
 
     private:
+        enum class EqType
+        {
+            Rho,
+            DRhoDt,
+            DPDt
+        };
+
+        enum class Stab
+        {
+            None,
+            Meduri
+        };
+
         double m_K0;
         double m_K0p;
         double m_rhoStar;

@@ -85,6 +85,8 @@ Solver(pProblem, pMesh, problemParams)
                 bool resV = checkBC(bcParamMomCont, n, node, "V", m_pMesh->getDim());
                 bool resT = checkBC(bcParamHeat, n, node, "T", 1);
                 bool resQ = checkBC(bcParamHeat, n, node, "Q", m_pMesh->getDim());
+                bool resQh = bcParamHeat.doesVarExist(m_pMesh->getNodeType(n) + "Qh") && bcParamHeat.checkAndGet<bool>(m_pMesh->getNodeType(n) + "Qh");
+                bool resQr = bcParamHeat.doesVarExist(m_pMesh->getNodeType(n) + "Qr") && bcParamHeat.checkAndGet<bool>(m_pMesh->getNodeType(n) + "Qr");
 
                 if(resV)
                     m_bcTagFlags[node.getTag()].set(0);
@@ -95,9 +97,30 @@ Solver(pProblem, pMesh, problemParams)
                 if(resQ)
                     m_bcTagFlags[node.getTag()].set(2);
 
-                if(resT && resQ)
+                if(resQh)
+                    m_bcTagFlags[node.getTag()].set(3);
+
+                if(resQr)
+                    m_bcTagFlags[node.getTag()].set(4);
+
+                if(resT && (resQ || resQh || resQr))
                     throw std::runtime_error("the boundary " + m_pMesh->getNodeType(n) +
                                              "has a BC for both T and Q. This is forbidden!");
+            }
+            else if(node.isOnFreeSurface())
+            {
+                bool resQ = checkFreeSurfaceBC(bcParamHeat, node, "Q", m_pMesh->getDim());
+                bool resQh = bcParamHeat.doesVarExist("FreeSurfaceQh") && bcParamHeat.checkAndGet<bool>("FreeSurfaceQh");
+                bool resQr = bcParamHeat.doesVarExist("FreeSurfaceQr") && bcParamHeat.checkAndGet<bool>("FreeSurfaceQr");
+
+                if(resQ)
+                    m_bcTagFlags[-2].set(2);
+
+                if(resQh)
+                    m_bcTagFlags[-2].set(3);
+
+                if(resQr)
+                    m_bcTagFlags[-2].set(4);
             }
         }
 
@@ -127,6 +150,8 @@ Solver(pProblem, pMesh, problemParams)
             {
                 bool resT = checkBC(bcParamHeat, n, node, "T", 1);
                 bool resQ = checkBC(bcParamHeat, n, node, "Q", m_pMesh->getDim());
+                bool resQh = bcParamHeat.doesVarExist(m_pMesh->getNodeType(n) + "Qh") && bcParamHeat.checkAndGet<bool>(m_pMesh->getNodeType(n) + "Qh");
+                bool resQr = bcParamHeat.doesVarExist(m_pMesh->getNodeType(n) + "Qr") && bcParamHeat.checkAndGet<bool>(m_pMesh->getNodeType(n) + "Qr");
 
                 if(resT)
                     m_bcTagFlags[node.getTag()].set(1);
@@ -134,7 +159,13 @@ Solver(pProblem, pMesh, problemParams)
                 if(resQ)
                     m_bcTagFlags[node.getTag()].set(2);
 
-                if(resT && resQ)
+                if(resQh)
+                    m_bcTagFlags[node.getTag()].set(3);
+
+                if(resQr)
+                    m_bcTagFlags[node.getTag()].set(4);
+
+                if(resT && (resQ || resQh || resQr))
                     throw std::runtime_error("the boundary " + m_pMesh->getNodeType(n) +
                                              "has a BC for both T and Q. This is forbidden!");
             }

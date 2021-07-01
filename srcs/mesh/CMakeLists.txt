@@ -14,12 +14,11 @@ if(USE_TBB_CGAL)
     find_package(TBB)
     if(TBB_FOUND)
         message(STATUS "Found TBB: " ${TBB_LIBRARIES})
+        include(CGAL_TBB_support)
     else()
         message(FATAL_ERROR "TBB not found!")
     endif()
 endif()
-
-include(CGAL_TBB_support)
 
 file(GLOB_RECURSE LIBMESH_SRCS
      "${PROJECT_SOURCE_DIR}/srcs/mesh/*.h"

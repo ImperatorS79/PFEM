@@ -52,20 +52,6 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
                       << iterCount << ")" << std::endl;
         }
 
-        if(!m_solve(qIterVec, qPrevVec))
-            return false;
-
-        iterCount++;
-
-        res = m_computeRes(qIterVec, qIterPrevVec);
-
-        if(verboseOutput && !m_runOnce)
-            std::cout << "\t * Relative 2-norm of q: " << res << " vs "
-                      << m_minRes << std::endl;
-
-        for(std::size_t i = 0 ; i < qIterVec.size() ; ++i)
-			qIterPrevVec[i] = qIterVec[i];
-
         if(iterCount > m_maxIter)
         {
             if(verboseOutput && !m_runOnce)
@@ -78,6 +64,18 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
             return false;
         }
 
+        if(!m_solve(qIterVec, qPrevVec))
+            return false;
+
+        res = m_computeRes(qIterVec, qIterPrevVec);
+
+        if(verboseOutput && !m_runOnce)
+            std::cout << "\t * Relative 2-norm of q: " << res << " vs "
+                      << m_minRes << std::endl;
+
+        for(std::size_t i = 0 ; i < qIterVec.size() ; ++i)
+			qIterPrevVec[i] = qIterVec[i];
+
         if(std::isnan(res))
         {
             if(verboseOutput)
@@ -86,6 +84,8 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
             pMesh->restoreNodesList();
             return false;
         }
+
+        iterCount++;
 
         if(m_runOnce)
             break;

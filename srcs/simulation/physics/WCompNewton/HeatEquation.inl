@@ -32,12 +32,14 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
 
     m_phaseChange = false;
     if(m_materialParams[0].doesVarExist("Tm")  || m_materialParams[0].doesVarExist("C") ||
-       m_materialParams[0].doesVarExist("eps") || m_materialParams[0].doesVarExist("DT"))
+       m_materialParams[0].doesVarExist("eps") || m_materialParams[0].doesVarExist("DT") ||
+       m_materialParams[0].doesVarExist("Lm"))
     {
         m_phaseChange = true;
 
-        m_Tm = m_materialParams[0].doesVarExist("Tm");
-        m_DT = m_materialParams[0].doesVarExist("DT");
+        m_Tm = m_materialParams[0].checkAndGet<double>("Tm");
+        m_DT = m_materialParams[0].checkAndGet<double>("DT");
+        m_Lm = m_materialParams[0].checkAndGet<double>("Lm");
     }
 
     if(bcFlags.size() != 4)
@@ -61,7 +63,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
                                              const NmatTypeHD<dim>& N) -> double {
             double rho = (N*getElementState<dim>(element, m_statesIndex[1])).value();
             double T = (N*getElementState<dim>(element, m_statesIndex[0])).value();
-            return (m_cv + m_getDflDT(T))*rho;
+            return (m_cv + m_getDflDT(T)*m_Lm)*rho;
         });
     }
 
@@ -73,12 +75,13 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
 
     m_pMatBuilder->setQFunc([&](const Facet& facet, const std::array<double, 3>& gp) -> Eigen::Matrix<double, dim, 1> {
         std::array<double, 3> pos = facet.getPosFromGP(gp);
-        std::vector<double> result;
-            result = m_bcParams[0].call<std::vector<double>>(m_pMesh->getNodeType(facet.getNodeIndex(0)) + "Q",
+
+        std::string nodeType = facet.isOnFreeSurface() ? "FreeSurface" : m_pMesh->getNodeType(facet.getNodeIndex(0));
+
+        std::array<double, dim> result;
+            result = m_bcParams[0].call<std::array<double, dim>>(nodeType + "Q",
                                                              pos,
-                                                             pos, //TO DO: fix
-                                                             m_pProblem->getCurrentSimTime() +
-                                                             m_pSolver->getTimeStep());
+                                                             m_pProblem->getCurrentSimTime());
 
         return Eigen::Matrix<double, dim, 1>::Map(result.data(), result.size());
     });
@@ -111,6 +114,11 @@ void HeatEqWCompNewton<dim>::displayParams() const
     std::cout << "Heat equation parameters:\n"
               << " * Specific heat capacity: " << m_cv << " J/(kg K)\n"
               << " * Heat conduction: " << m_k << " W/(mK)" << std::endl;
+    if(m_phaseChange)
+    {
+        std::cout << " * Melting temperature: " << m_Tm << " K\n"
+                  << " * DT: " << m_DT << " K" << std::endl;
+    }
 }
 
 template<unsigned short dim>
@@ -157,17 +165,22 @@ void HeatEqWCompNewton<dim>::m_applyBC()
         bool boundaryQ = true;
         bool boundaryQh = true;
         bool boundaryQr = true;
+        bool fs = facet.isOnFreeSurface();
         for(uint8_t n = 0 ; n < noPerFacet ; ++n)
         {
             const Node& node = facet.getNode(n);
 
-            if(!m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[1]))
+            int tag = node.getTag();
+            if(fs)
+                tag = -2;
+
+            if(!m_pSolver->getBcTagFlags(tag, m_bcFlags[1]))
                 boundaryQ = false;
 
-            if(!m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[2]))
+            if(!m_pSolver->getBcTagFlags(tag, m_bcFlags[2]))
                 boundaryQh = false;
 
-            if(!m_pSolver->getBcTagFlags(node.getTag(), m_bcFlags[3]))
+            if(!m_pSolver->getBcTagFlags(tag, m_bcFlags[3]))
                 boundaryQr = false;
         }
 
@@ -220,8 +233,6 @@ void HeatEqWCompNewton<dim>::m_applyBC()
             std::array<double, 1> result;
             result = m_bcParams[0].call<std::array<double, 1>>(m_pMesh->getNodeType(n) + "T",
                                                              node.getPosition(),
-                                                             m_pMesh->getBoundNodeInitPos(n),
-                                                             node.getStates(),
                                                              m_pProblem->getCurrentSimTime() +
                                                              m_pSolver->getTimeStep());
             m_F(n) = result[0];
@@ -287,5 +298,5 @@ void HeatEqWCompNewton<dim>::m_buildSystem()
 template<unsigned short dim>
 double HeatEqWCompNewton<dim>::m_getDflDT(double T)
 {
-    return -2*3/(m_DT*m_DT*m_DT)*T*T + 6*2*m_Tm/(m_DT*m_DT*m_DT)*T + (3/(2*m_DT) - 6*m_Tm*m_Tm/(m_DT*m_DT*m_DT));
+    return static_cast<double>(T > m_Tm - m_DT/2)*static_cast<double>(T < m_Tm + m_DT/2)*(-2*3/(m_DT*m_DT*m_DT)*T*T + 6*2*m_Tm/(m_DT*m_DT*m_DT)*T + (3/(2*m_DT) - 6*m_Tm*m_Tm/(m_DT*m_DT*m_DT)));
 }

@@ -245,3 +245,11 @@ std::vector<double> Facet::getState(unsigned int stateIndex) const noexcept
 
     return states;
 }
+
+bool Facet::isOnFreeSurface() const noexcept
+{
+    if(m_pMesh->getDim() == 2)
+        return getNode(0).isOnFreeSurface() && getNode(1).isOnFreeSurface();
+    else
+        return getNode(0).isOnFreeSurface() && getNode(1).isOnFreeSurface() && getNode(2).isOnFreeSurface();
+}

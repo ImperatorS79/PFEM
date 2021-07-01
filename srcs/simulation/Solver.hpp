@@ -41,6 +41,7 @@ class SIMULATION_API Solver
         void displayTimeStats() const;
 
         bool checkBC(SolTable bcParam, unsigned int n, const Node& node, std::string bcString, unsigned int expectedBCSize);
+        bool checkFreeSurfaceBC(SolTable bcParam, const Node& node, std::string bcString, unsigned int expectedBCSize);
 
         inline bool getBcTagFlags(int tag, unsigned short flag) const noexcept;
 

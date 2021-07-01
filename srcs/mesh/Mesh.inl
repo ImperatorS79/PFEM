@@ -49,17 +49,6 @@ inline std::size_t Mesh::getNodesCount() const noexcept
     return m_nodesList.size();
 }
 
-std::array<double, 3> Mesh::getBoundNodeInitPos(std::size_t nodeIndex) const
-{
-    auto it = m_boundaryInitialPos.find(nodeIndex);
-
-    if(it == m_boundaryInitialPos.end())
-        throw std::runtime_error("initial position is only available for boundary nodes!");
-    else
-        return it->second;
-}
-
-
 inline std::array<double, 3> Mesh::getBoundFSNormal(std::size_t nodeIndex) const
 {
     if(m_computeNormalCurvature == false)

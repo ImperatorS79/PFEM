@@ -98,7 +98,7 @@ Solver(pProblem, pMesh, problemParams)
         //Set the right node flag if the boundary condition is present
         SolTable bcParamMomCont = m_pEquations[1]->getBCParam(0);
         SolTable bcParamHeat = m_pEquations[2]->getBCParam(0);
-        for(std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n)
+        for(std::size_t n = 0 ; n < m_pMesh->getNodesCount() ; ++n) //No need to check every node normally...
         {
             const Node& node = m_pMesh->getNode(n);
             if(node.isBound())
@@ -127,6 +127,21 @@ Solver(pProblem, pMesh, problemParams)
                 if(resT && (resQ || resQh || resQr))
                     throw std::runtime_error("the boundary " + m_pMesh->getNodeType(n) +
                                              "has a BC for both T and Q. This is forbidden!");
+            }
+            else if(node.isOnFreeSurface())
+            {
+                bool resQ = checkFreeSurfaceBC(bcParamHeat, node, "Q", dim);
+                bool resQh = bcParamHeat.doesVarExist("FreeSurfaceQh") && bcParamHeat.checkAndGet<bool>("FreeSurfaceQh");
+                bool resQr = bcParamHeat.doesVarExist("FreeSurfaceQr") && bcParamHeat.checkAndGet<bool>("FreeSurfaceQr");
+
+                if(resQ)
+                    m_bcTagFlags[-2].set(2);
+
+                if(resQh)
+                    m_bcTagFlags[-2].set(3);
+
+                if(resQr)
+                    m_bcTagFlags[-2].set(4);
             }
         }
 
@@ -207,11 +222,11 @@ void SolverWCompNewton::computeNextDT()
                 maxSquaredSpeedFluid = std::max(maxSquaredSpeedFluid, u2);
             }
             m_timeStep = std::min(m_timeStep, m_securityCoeff*m_securityCoeff*he*he/maxSquaredSpeedFluidPressureVN);
-            m_remeshTimeStep = std::max(m_remeshTimeStep, maxSquaredSpeedFluid);
+            m_remeshTimeStep = std::max(m_remeshTimeStep, he*he/maxSquaredSpeedFluid);
         }
 
         m_timeStep = std::min(std::sqrt(m_timeStep), m_maxDT);
-        m_remeshTimeStep = std::min(std::sqrt(m_remeshTimeStep), m_maxRemeshDT);
+        m_remeshTimeStep = std::min(0.01*std::sqrt(m_remeshTimeStep), m_maxRemeshDT);
 
         if(std::isnan(m_timeStep) || std::isnan(m_remeshTimeStep))
             throw std::runtime_error("NaN time step!");
@@ -296,6 +311,8 @@ bool SolverWCompNewton::m_solveBoussinesqWC()
     {
         m_pMesh->remesh(m_pProblem->isOutputVerbose());
         m_nextTimeToRemesh += m_maxDT;
+        for(auto& pMeshSmoother: m_pMeshSmoothers)
+            pMeshSmoother->smooth(m_pProblem->isOutputVerbose());
     }
     m_accumalatedTimes["Remeshing"] += m_clock.end();
 

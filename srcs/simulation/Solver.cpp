@@ -22,6 +22,7 @@ m_pProblem(pProblem)
 
     m_adaptDT = m_solverParams[0].checkAndGet<bool>("adaptDT");
     m_maxDT = m_solverParams[0].checkAndGet<double>("maxDT");
+//    m_maxRemeshDT = m_solverParams[0].checkAndGet<double>("maxRemeshDT");
     m_initialDT = m_solverParams[0].checkAndGet<double>("initialDT");
 
     if(m_solverParams[0].doesVarExist("MeshSmoother"))
@@ -59,7 +60,10 @@ m_pProblem(pProblem)
         });
     }
 
-    m_nextTimeToRemesh = m_maxDT;
+//    if(m_maxRemeshDT != -1)
+//        m_nextTimeToRemesh = m_maxRemeshDT;
+//    else
+//        m_nextTimeToRemesh = m_maxDT;
 }
 
 Solver::~Solver()
@@ -104,22 +108,39 @@ void Solver::computeNextDT()
 bool Solver::checkBC(SolTable bcParam, unsigned int n, const Node& node, std::string bcString, unsigned int expectedBCSize)
 {
     bool res = bcParam.checkCallNoThrow(m_pMesh->getNodeType(n) + bcString,
-                                        node.getPosition(),
-                                        m_pMesh->getBoundNodeInitPos(n),
-                                        node.getStates(), 0);
+                                        node.getPosition(), 0);
 
     if(res)
     {
         std::vector<double> result = bcParam.call<std::vector<double>>(
             m_pMesh->getNodeType(n) + bcString,
-            node.getPosition(),
-            m_pMesh->getBoundNodeInitPos(n),
-            node.getStates(),
-            0);
+            node.getPosition(), 0);
 
         if(result.size() != expectedBCSize)
         {
             throw std::runtime_error(" the boundary condition " + m_pMesh->getNodeType(n) + bcString +
+                                     " does not return the right number of states: " +
+                                     std::to_string(result.size()) + " vs " +  std::to_string(expectedBCSize));
+        }
+    }
+
+    return res;
+}
+
+bool Solver::checkFreeSurfaceBC(SolTable bcParam, const Node& node, std::string bcString, unsigned int expectedBCSize)
+{
+    bool res = bcParam.checkCallNoThrow("FreeSurface" + bcString,
+                                        node.getPosition(), 0);
+
+    if(res)
+    {
+        std::vector<double> result = bcParam.call<std::vector<double>>(
+            "FreeSurface" + bcString,
+            node.getPosition(), 0);
+
+        if(result.size() != expectedBCSize)
+        {
+            throw std::runtime_error(" the boundary condition FreeSurface" + bcString +
                                      " does not return the right number of states: " +
                                      std::to_string(result.size()) + " vs " +  std::to_string(expectedBCSize));
         }
@@ -140,7 +161,7 @@ void Solver::m_conditionalRemesh()
     {
         force = true;
         m_pMesh->remesh(m_pProblem->isOutputVerbose());
-        //std::cout << "Remeshing at: " << std::fixed << m_pProblem->getCurrentSimTime() << std::endl;
+        std::cout << "Remeshing at: " << std::fixed << m_pProblem->getCurrentSimTime() << std::endl;
     }
 
     if(force || m_pProblem->getCurrentSimTime() + m_remeshTimeStep < m_nextTimeToRemesh)

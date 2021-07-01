@@ -18,6 +18,7 @@ m_boundingBox(meshInfos.boundingBox),
 m_exclusionZones(meshInfos.exclusionZones),
 m_addOnFS(meshInfos.addOnFS),
 m_deleteFlyingNodes(meshInfos.deleteFlyingNodes),
+m_laplacianSmoothingBoundaries(meshInfos.laplacianSmoothingBoundaries),
 m_computeNormalCurvature(true)
 {
     loadFromFile(meshInfos.mshFile);
@@ -578,6 +579,9 @@ std::vector<std::vector<double>> Mesh::getGradShapeFunctions(unsigned int dimens
 
 void Mesh::laplacianSmoothingBoundaries()
 {
+    if(!m_laplacianSmoothingBoundaries)
+        return;
+
     for(std::size_t elm = 0 ; elm < m_elementsList.size() ; ++elm)
     {
         const Element& element = m_elementsList[elm];
@@ -832,7 +836,6 @@ void Mesh::loadFromFile(const std::string& fileName)
                     node.m_tag = static_cast<int>(std::distance(m_tagNames.begin(), posBCinTagNames));
                 }
                 m_nodesList.push_back(std::move(node));
-                m_boundaryInitialPos[m_nodesList.size() - 1] = m_nodesList.back().m_position;
             }
         }
     }
@@ -915,7 +918,7 @@ void Mesh::loadFromFile(const std::string& fileName)
 
 void Mesh::remesh(bool verboseOutput)
 {
-    //laplacianSmoothingBoundaries();
+    laplacianSmoothingBoundaries();
     addNodes(verboseOutput);
     removeNodes(verboseOutput);
     checkBoundingBox(verboseOutput);
