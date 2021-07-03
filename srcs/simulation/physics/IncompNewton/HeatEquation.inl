@@ -43,8 +43,8 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         m_Lm = m_materialParams[0].checkAndGet<double>("Lm");
     }
 
-    if(bcFlags.size() != 2)
-        throw std::runtime_error("the " + getID() + " equation require two flags for two possible boundary conditiosn!");
+    if(bcFlags.size() != 4)
+        throw std::runtime_error("the " + getID() + " equation require two flags for four possible boundary conditions!");
 
     if(statesIndex.size() != 1)
         throw std::runtime_error("the " + getID() + " equation require one state index describing the T state !");
@@ -75,6 +75,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         std::array<double, 3> pos = facet.getPosFromGP(gp);
 
         std::string nodeType = facet.isOnFreeSurface() ? "FreeSurface" : m_pMesh->getNodeType(facet.getNodeIndex(0));
+
 
         std::array<double, dim> result;
             result = m_bcParams[0].call<std::array<double, dim>>(nodeType + "Q",
@@ -119,7 +120,6 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         m_accumalatedTimes["Save/restore nodeslist"] += m_clock.end();
 
         m_buildAb(qPrevVec[0]);
-
         m_clock.start();
         m_applyBC(qPrevVec[0]);
         m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
@@ -134,14 +134,18 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
             m_clock.start();
             qIterVec[0] = m_solverIt.solveWithGuess(m_b, qPrevVec[0]);
             m_accumalatedTimes["Solve system"] += m_clock.end();
+
             m_clock.start();
             setNodesStatesfromQ(m_pMesh, qIterVec[0], m_statesIndex[0], m_statesIndex[0]);
             m_accumalatedTimes["Update solution"] += m_clock.end();
-            m_buildAb(qPrevVec[0]);
 
-            m_clock.start();
-            m_applyBC(qPrevVec[0]);
-            m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
+            if(m_phaseChange)
+            {
+                m_buildAb(qPrevVec[0]);
+                m_clock.start();
+                m_applyBC(qPrevVec[0]);
+                m_accumalatedTimes["Apply boundary conditions"] += m_clock.end();
+            }
             return true;
         }
         else
@@ -182,7 +186,7 @@ Equation(pProblem, pSolver, pMesh, solverParams, materialParams, bcFlags, states
         }
         else
         {
-            return(m_A*qIterVec[0] - m_b).norm();
+            return (m_A*qIterVec[0] - m_b).norm();
         }
 
     }, maxIter, minRes);
@@ -240,12 +244,12 @@ void HeatEqIncompNewton<dim>::m_buildAb(const Eigen::VectorXd& qPrev)
 
         auto gradNe = m_pMatBuilder->getGradN(element);
         auto Be = m_pMatBuilder->getB(gradNe);
-        auto Me_dt = (1/dt)*m_pMatBuilder->getM(element);
-        auto Le = m_pMatBuilder->getL(element, Be, gradNe);
+        auto Me = m_pMatBuilder->getM(element);
+        auto Le = dt*m_pMatBuilder->getL(element, Be, gradNe);
 
         auto thetaPrev = getElementState<dim>(qPrev, element, 0, nNodes);
 
-        auto MThetaPreve_dt = Me_dt*thetaPrev;
+        auto MThetaPreve = Me*thetaPrev;
 
         std::size_t countA = 0;
         std::size_t countb = 0;
@@ -263,7 +267,7 @@ void HeatEqIncompNewton<dim>::m_buildAb(const Eigen::VectorXd& qPrev)
                         indexA[tripletPerElm*elm + countA] =
                             Eigen::Triplet<double>(element.getNodeIndex(i),
                                                    element.getNodeIndex(j),
-                                                   Me_dt(i, j));
+                                                   Me(i, j));
                     }
                     countA++;
 
@@ -281,7 +285,7 @@ void HeatEqIncompNewton<dim>::m_buildAb(const Eigen::VectorXd& qPrev)
             /************************************************************************
                                             Build h
             ************************************************************************/
-            indexb[noPerEl*elm + countb] = std::make_pair(element.getNodeIndex(i), MThetaPreve_dt[i]);
+            indexb[noPerEl*elm + countb] = std::make_pair(element.getNodeIndex(i), MThetaPreve[i]);
 
             countb++;
         }
@@ -320,6 +324,8 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
     const std::size_t facetsCount = m_pMesh->getFacetsCount();
     constexpr std::size_t noPerFacet = dim;
 
+    const double dt = m_pSolver->getTimeStep();
+
     for(std::size_t f = 0 ; f < facetsCount ; ++f)
     {
         const Facet& facet = m_pMesh->getFacet(f);
@@ -354,7 +360,7 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
 
             for(unsigned short i = 0 ; i < noPerFacet ; ++i)
             {
-                m_b(facet.getNodeIndex(i)) -= qn[i];
+                m_b(facet.getNodeIndex(i)) -= dt*qn[i];
             }
         }
 
@@ -364,7 +370,7 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
 
             for(unsigned short i = 0 ; i < noPerFacet ; ++i)
             {
-                m_b(facet.getNodeIndex(i)) -= SGammah[i];
+                m_b(facet.getNodeIndex(i)) -= dt*SGammah[i];
             }
         }
 
@@ -374,7 +380,7 @@ void HeatEqIncompNewton<dim>::m_applyBC(const Eigen::VectorXd& qPrev)
 
             for(unsigned short i = 0 ; i < noPerFacet ; ++i)
             {
-                m_b(facet.getNodeIndex(i)) -= SGammar[i];
+                m_b(facet.getNodeIndex(i)) -= dt*SGammar[i];
             }
         }
 

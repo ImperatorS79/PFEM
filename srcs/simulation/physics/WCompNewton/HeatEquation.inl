@@ -159,6 +159,8 @@ void HeatEqWCompNewton<dim>::m_applyBC()
     const std::size_t facetsCount = m_pMesh->getFacetsCount();
     constexpr std::size_t noPerFacet = dim;
 
+    const double dt = m_pSolver->getTimeStep();
+
     for(std::size_t f = 0 ; f < facetsCount ; ++f)
     {
         const Facet& facet = m_pMesh->getFacet(f);
@@ -193,7 +195,7 @@ void HeatEqWCompNewton<dim>::m_applyBC()
 
             for(unsigned short i = 0 ; i < noPerFacet ; ++i)
             {
-                m_F(facet.getNodeIndex(i)) -= qn[i];
+                m_F(facet.getNodeIndex(i)) -= dt*qn[i];
             }
         }
 
@@ -203,7 +205,7 @@ void HeatEqWCompNewton<dim>::m_applyBC()
 
             for(unsigned short i = 0 ; i < noPerFacet ; ++i)
             {
-                m_F(facet.getNodeIndex(i)) -= SGammah[i];
+                m_F(facet.getNodeIndex(i)) -= dt*SGammah[i];
             }
         }
 
@@ -213,7 +215,7 @@ void HeatEqWCompNewton<dim>::m_applyBC()
 
             for(unsigned short i = 0 ; i < noPerFacet ; ++i)
             {
-                m_F(facet.getNodeIndex(i)) -= SGammar[i];
+                m_F(facet.getNodeIndex(i)) -= dt*SGammar[i];
             }
         }
 

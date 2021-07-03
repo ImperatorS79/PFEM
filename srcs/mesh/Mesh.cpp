@@ -120,7 +120,7 @@ bool Mesh::addNodes(bool verboseOutput)
 
             if(verboseOutput)
             {
-                std::cout << "Adding node (" << "(";
+                std::cout << "Adding node (";
                 for(unsigned short d = 0 ; d < m_dim ; ++d)
                 {
                     std::cout << m_nodesList[m_nodesList.size() - 1].m_position[d];

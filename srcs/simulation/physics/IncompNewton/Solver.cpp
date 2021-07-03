@@ -67,7 +67,7 @@ Solver(pProblem, pMesh, problemParams)
         else
             m_pEquations[0] = REGISTER_EQ(MomContEqIncompNewton, 3)
 
-        bcFlags = {1, 2}; //Dirichlet and Neumann
+        bcFlags = {1, 2, 3, 4}; //Dirichlet and Neumann
         statesIndex = {static_cast<unsigned int>(m_pMesh->getDim()) + 1};
         if(m_pMesh->getDim() == 2)
             m_pEquations[1] = REGISTER_EQ(HeatEqIncompNewton, 2)
@@ -134,7 +134,7 @@ Solver(pProblem, pMesh, problemParams)
         //The heat equation
         m_pEquations.resize(1);
 
-        bcFlags = {1, 2}; //Dirichlet and Neumann
+        bcFlags = {1, 2, 3, 4}; //Dirichlet and Neumann
         statesIndex = {0};
         if(m_pMesh->getDim() == 2)
             m_pEquations[0] = REGISTER_EQ(HeatEqIncompNewton, 2)

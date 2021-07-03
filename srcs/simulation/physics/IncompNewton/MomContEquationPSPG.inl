@@ -337,15 +337,8 @@ void MomContEqIncompNewton<dim>::m_setupPicardPSPG(unsigned int maxIter, double 
 
             if(den == 0)
                 resV = std::numeric_limits<double>::max();
-            else if(den < 1e-15 && num < 1e-15)
-                resV = 0;
             else
-            {
-                if(den < 0.001*m_pMesh->getHchar()/m_pSolver->getTimeStep())
-                    resV = std::sqrt(num);
-                else
-                    resV = std::sqrt(num/den);
-            }
+                resV = std::sqrt(num/den);
 
             if(m_residual == Res::U_P)
             {
