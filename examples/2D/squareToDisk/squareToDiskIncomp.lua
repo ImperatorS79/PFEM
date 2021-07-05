@@ -1,17 +1,18 @@
 Problem = {
     id = "IncompNewtonNoT",
-	simulationTime = 5.1,
+	simulationTime = 4,
 	verboseOutput = true,
 	
 	Mesh = {
-		hchar = 0.1,
+		hchar = 0.05,
 		alpha = 1.2,
 		omega = 0.7,
-		gamma = 0.7,
-		addOnFS = true,
-		deleteFlyingNodes = false,
+		gamma = 0.3,
 		boundingBox = {-2, -2, 2, 2},
 		exclusionZones = {},
+		addOnFS = true,
+		deleteFlyingNodes = false,
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/2D/squareToDisk/geometry.msh"
 	},
 	
@@ -20,7 +21,7 @@ Problem = {
 			kind = "GMSH",
 			outputFile = "results.msh",
 			timeBetweenWriting = 0.1,
-			whatToWrite = {"p", "ke", "normals", "curvatures"},
+			whatToWrite = {"p", "ke"},
 			writeAs = "NodesElements" 
 		} 
 	},
@@ -28,7 +29,7 @@ Problem = {
 	Material = {
 		mu = 1.0,
 		rho = 100,
-		gamma = 1.0
+		gamma = 1.9
 	},
 	
 	IC = {
@@ -40,14 +41,15 @@ Problem = {
 		adaptDT = true,
 		coeffDTincrease = 1.5,
 		coeffDTDecrease = 2,
-		maxDT = 0.005,
-		initialDT = 0.005,
+		maxDT = 0.0025,
+		initialDT = 0.0025,
 		
 		MomContEq = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, 0},
-			computePres = false,
+			gammaFS = 1,
+			residual = "Ax_f",
 			BC = {
 
 			}

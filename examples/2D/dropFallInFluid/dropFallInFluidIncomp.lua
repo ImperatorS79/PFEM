@@ -4,22 +4,23 @@ Problem = {
 	verboseOutput = true,
 	
 	Mesh = {
-		hchar = 0.0292,
+		hchar = 0.0073,
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
+		boundingBox = {-0.05, -0.05, 0.634, 100},
 		addOnFS = true,
-		deleteFlyingNodes = false,
-		boundingBox = {-2, -1, 12, 100},
+		deleteFlyingNodes = true,
 		exclusionZones = {},
-		mshFile = "examples/2D/dropFall/geometry.msh"
+		laplacianSmoothingBoundaries = false,
+		mshFile = "examples/2D/dropFallInFluid/geometry.msh"
 	},
 	
 	Extractors = {
 		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.2,
+			timeBetweenWriting = 0.05,
 			whatToWrite = {"p", "ke"},
 			writeAs = "NodesElements" 
 		}
@@ -47,7 +48,7 @@ Problem = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, -9.81},
-			computePres = false,
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -59,6 +60,6 @@ function Problem.IC:initStates(pos)
 	return {0, 0, 0}
 end
 
-function Problem.Solver.MomContEq.BC:BoundaryV(pos, initPos, states, t)
+function Problem.Solver.MomContEq.BC:BoundaryV(pos, t)
 	return {0, 0}
 end

@@ -8,10 +8,11 @@ Problem = {
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
+		boundingBox = {-0.05, -0.05, 4.05, 100},
+		exclusionZones ={},
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-0.05, -0.05, 4.05, 100},
-		exclusionZones = {},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/2D/coolingBallInFluid/geometry.msh"
 	},
 	
@@ -32,9 +33,13 @@ Problem = {
 		Tr = 650,
 		cv = 4186,
 		gamma = 0,
+		DgammaDT = 0,
 		K0 = 2200000,
 		K0p = 7.6,
-		rhoStar = 1000
+		rhoStar = 1000,
+		h = 0,
+		Tinf = 650,
+		epsRad = 0
 	},
 	
 	IC = {
@@ -42,7 +47,7 @@ Problem = {
 	},
 	
 	Solver = {
-	    id = "CDS_Meduri",
+	    id = "CDS_dpdt",
 		adaptDT = true,
 		maxDT = 0.0025,
 		initialDT = 1e-8,
@@ -56,8 +61,7 @@ Problem = {
 		},
 		
 		ContEq = {
-			strongContinuity = false,
-			enableStab = false,
+			stabilization = "Meduri",
 			BC = {
 
 			}
@@ -108,10 +112,10 @@ function Problem.IC:initStates(pos)
 	end
 end
 
-function Problem.Solver.HeatEq.BC:BoundaryQ(pos, initPos, states, t) 
-	return {0}
+function Problem.Solver.HeatEq.BC:BoundaryQ(pos, t) 
+	return {0, 0}
 end
 
-function Problem.Solver.MomEq.BC:BoundaryV(pos, initPos, states, t) 
+function Problem.Solver.MomEq.BC:BoundaryV(pos, t) 
 	return {0, 0}
 end

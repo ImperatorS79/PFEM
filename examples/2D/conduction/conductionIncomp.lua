@@ -1,10 +1,10 @@
 Problem = {
     id = "Conduction",
-	simulationTime = 1,
+	simulationTime = 20,
 	verboseOutput = false,
 	
 	Mesh = {
-		hchar = 0.05,
+		hchar = 0.025,
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
@@ -12,6 +12,7 @@ Problem = {
 		deleteFlyingNodes = false,
 		boundingBox = {-1, -0.25, 5, 1.25},
 		exclusionZones = {},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/2D/conduction/geometry.msh"
 	},
 	
@@ -19,8 +20,8 @@ Problem = {
 		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.01,
-			whatToWrite = {"T", "normals"},
+			timeBetweenWriting = 0.5,
+			whatToWrite = {"T"},
 			writeAs = "NodesElements" 
 		}
 	},
@@ -28,7 +29,10 @@ Problem = {
 	Material = {
 		rho = 1,
 		k = 237,
-		cv = 1000
+		cv = 1000,
+		h = 0,
+		Tinf = 300,
+		epsRad = 0
 	},
 	
 	IC = {
@@ -49,6 +53,7 @@ Problem = {
 		HeatEq = {
 			minRes = 1e-6,
 			maxIter = 10,
+			residual = "T",
 			BC = {
 
 			}
@@ -60,26 +65,24 @@ function Problem.IC:initStates(pos)
 	return {10*math.exp(-((pos[1]-0.5)^2 + (pos[2]-0.5)^2)/0.05)}
 end
 
-function Problem.Solver.HeatEq.BC:DownQ(pos, initPos, states, t)
-	return {0, 0}
-end
-
-function Problem.Solver.HeatEq.BC:UpQ(pos, initPos, states, t)
-	return {0, 0}
-end
-
-function Problem.Solver.HeatEq.BC:LeftT(pos, initPos, states, t)
+--[[
+function Problem.Solver.HeatEq.BC:LeftT(pos, t)
 	return {0}
 end
 
-function Problem.Solver.HeatEq.BC:RightT(pos, initPos, states, t)
+function Problem.Solver.HeatEq.BC:RightT(pos, t)
 	return {0}
 end
+]]--
 
--- function Problem.Solver.HeatEq.BC:DownQ(pos, initPos, states, t)
-	-- return {0}
--- end
+function Problem.Solver.HeatEq.BC:UpT(pos, t)
+	return {10}
+end
 
--- function Problem.Solver.HeatEq.BC:RightQ(pos, initPos, states, t)
+function Problem.Solver.HeatEq.BC:DownQ(pos, t)
+	return {-4*237, 0}
+end
+
+-- function Problem.Solver.HeatEq.BC:RightQ(pos, t)
 	-- return {0}
 -- end

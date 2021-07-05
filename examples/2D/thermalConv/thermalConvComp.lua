@@ -12,6 +12,7 @@ Problem = {
 		deleteFlyingNodes = false,
 		boundingBox = {-0.05, -0.05, 1.05, 1.05},
 		exclusionZones = {},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/2D/thermalConv/geometry.msh"
 	},
 	
@@ -34,7 +35,11 @@ Problem = {
 		gamma = 0,
 		K0 = 2200000,
 		K0p = 7.6,
-		rhoStar = 1000
+		rhoStar = 1000,
+		DgammaDT = 0,
+		h = 0,
+		Tinf = 300,
+		epsRad = 0
 	},
 	
 	IC = {
@@ -45,11 +50,11 @@ Problem = {
 	},
 	
 	Solver = {
-	    id = "CDS_Meduri",
+	    id = "CDS_dpdt",
 		adaptDT = true,
 		maxDT = 0.02,
 		initialDT = 1e-8,
-		securityCoeff = 10,
+		securityCoeff = 0.1,
 		
 		MomEq = {
 			bodyForce = {0, -9.81},
@@ -59,8 +64,7 @@ Problem = {
 		},
 		
 		ContEq = {
-			strongContinuity = false,
-			enableStab = false,
+			stabilization = "Meduri",
 			BC = {
 
 			}
@@ -114,35 +118,35 @@ function Problem.IC:initRightStates(pos)
 	return {0, 0, p, rho, 0, 0, 290}
 end
 
-function Problem.Solver.HeatEq.BC:TopQ(pos, initPos, states, t) 
-	return {0}
-end
-
-function Problem.Solver.MomEq.BC:TopV(pos, initPos, states, t) 
+function Problem.Solver.HeatEq.BC:TopQ(pos, t) 
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:BottomQ(pos, initPos, states, t) 
-	return {0}
-end
-
-function Problem.Solver.MomEq.BC:BottomV(pos, initPos, states, t) 
+function Problem.Solver.MomEq.BC:TopV(pos, t) 
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:LeftT(pos, initPos, states, t) 
+function Problem.Solver.HeatEq.BC:BottomQ(pos, t) 
+	return {0, 0}
+end
+
+function Problem.Solver.MomEq.BC:BottomV(pos, t) 
+	return {0, 0}
+end
+
+function Problem.Solver.HeatEq.BC:LeftT(pos, t) 
 	return {310}
 end
 
-function Problem.Solver.MomEq.BC:LeftV(pos, initPos, states, t) 
+function Problem.Solver.MomEq.BC:LeftV(pos, t) 
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:RightT(pos, initPos, states, t) 
+function Problem.Solver.HeatEq.BC:RightT(pos, t) 
 	return {290}
 end
 
-function Problem.Solver.MomEq.BC:RightV(pos, initPos, states, t) 
+function Problem.Solver.MomEq.BC:RightV(pos, t) 
 	return {0, 0}
 end
 

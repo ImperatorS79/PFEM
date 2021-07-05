@@ -1,7 +1,7 @@
 //+
 L = 1;
 //+
-H = 0.75;
+H = 0.5;
 //+
 R = 0.02;
 //+
@@ -29,34 +29,28 @@ Point(8) = {E, -H/2, 0, d};
 //+
 Point(9) = {E, H/2, 0, d};
 //+
-Line(1) = {1, 2};
-//+
-Line(2) = {2, 9};
-//+
-Line(3) = {9, 4};
-//+
-Line(4) = {1, 8};
-//+
-Line(5) = {8, 3};
-//+
-Line(6) = {8, 9};
-//+
 Circle(7) = {6, 5, 7};
 //+
 Circle(8) = {7, 5, 6};
 //+
-Physical Curve("FluidInput") = {1};
+Line(9) = {2, 1};
 //+
-Physical Curve("FreeSurface") = {6};
+Line(10) = {1, 8};
 //+
-Physical Curve("Walls") = {2, 3, 4, 5};
+Line(11) = {8, 9};
 //+
-Physical Curve("CylinderWall") = {8, 7};
+Line(12) = {9, 2};
 //+
-Curve Loop(1) = {1, 2, -6, -4};
+Curve Loop(1) = {9, 10, 11, 12};
 //+
-Curve Loop(2) = {7, 8};
+Curve Loop(2) = {8, 7};
 //+
 Surface(1) = {1, 2};
 //+
-Physical Surface("Fluid", 9) = {1};
+Physical Surface("Fluid") = {1};
+//+
+Physical Curve("FreeSurface") = {12, 11, 10};
+//+
+Physical Curve("FluidInput") = {9};
+//+
+Physical Curve("CylinderWall") = {8, 7};

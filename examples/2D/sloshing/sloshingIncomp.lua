@@ -1,21 +1,29 @@
 Problem = {
     id = "IncompNewtonNoT",
 	simulationTime = 4,
-	verboseOutput = true,
+	verboseOutput = false,
 	
 	Mesh = {
-		hchar = 0.0073,
+		hchar = 0.02,
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
+		boundingBox = {-2, -1, 12, 100},
 		addOnFS = true,
-		deleteFlyingNodes = false,
-		boundingBox = {-0.05, -0.05, 0.634, 100},
+		deleteFlyingNodes = true,
 		exclusionZones = {},
-		mshFile = "examples/2D/dropFallInFluid/geometry.msh"
+		laplacianSmoothingBoundaries = false,
+		mshFile = "examples/2D/sloshing/geometry.msh"
 	},
 	
 	Extractors = {
+		{
+			kind = "MinMax",
+			outputFile = "topPositionSloshing.txt",
+			timeBetweenWriting = 0.01,
+			minMax = "max",
+			coordinate = 1 
+		},
 		{
 			kind = "GMSH",
 			outputFile = "results.msh",
@@ -26,8 +34,8 @@ Problem = {
 	},
 	
 	Material = {
-		mu = 1e-3,
-		rho = 1000,
+		mu = 0.01,
+		rho = 1,
 		gamma = 0
 	},
 	
@@ -40,14 +48,14 @@ Problem = {
 		adaptDT = true,
 		coeffDTincrease = 1.5,
 		coeffDTDecrease = 2,
-		maxDT = 0.001,
-		initialDT = 0.001,
+		maxDT = 0.01,
+		initialDT = 0.01,
 		
 		MomContEq = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, -9.81},
-			computePres = false,
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -59,6 +67,6 @@ function Problem.IC:initStates(pos)
 	return {0, 0, 0}
 end
 
-function Problem.Solver.MomContEq.BC:BoundaryV(pos, initPos, states, t)
+function Problem.Solver.MomContEq.BC:BoundaryV(pos, t)
 	return {0, 0}
 end

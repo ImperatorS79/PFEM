@@ -1,15 +1,16 @@
 Problem = {
     id = "Boussinesq",
 	simulationTime = 50,
-	verboseOutput = false,
+	verboseOutput = true,
 	
 	Mesh = {
 		hchar = 0.02,
-		alpha = 1.2,
+		alpha = 1.25,
 		omega = 0.7,
-		gamma = 0.7,
+		gamma = 0.6,
 		addOnFS = true,
 		deleteFlyingNodes = false,
+		laplacianSmoothingBoundaries = false,
 		boundingBox = {-0.05, -0.05, 4.05, 100},
 		exclusionZones = {},
 		mshFile = "examples/2D/rayleigh/geometry.msh"
@@ -19,8 +20,8 @@ Problem = {
 		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.4,
-			whatToWrite = {"T", "ke"},
+			timeBetweenWriting = 0.1,
+			whatToWrite = {"T", "ke", "p"},
 			writeAs = "NodesElements" 
 		}
 	},
@@ -32,11 +33,14 @@ Problem = {
 		alpha = 69e-6,
 		Tr = 650,
 		cv = 1,
-		gamma = 0
+		gamma = 0,
+		DgammaDT = 0,
+		h = 5,
+		Tinf = 300,
+		epsRad = 0
 	},
 	
 	IC = {
-		TopFixed = true,
 		BottomFixed = true,
 		LeftFixed = true,
 		RightFixed = true
@@ -47,15 +51,17 @@ Problem = {
 		adaptDT = true,
 		coeffDTincrease = 1.5,
 		coeffDTDecrease = 2,
-		maxDT = 0.1,
-		initialDT = 0.1,
+		maxDT = 0.01,
+		initialDT = 0.01,
 		solveHeatFirst = true,
 		
 		MomContEq = {
 			minRes = 1e-6,
 			maxIter = 10,
+			computePres = true,
 			bodyForce = {0, -9.81},
-			computePres = false,
+			gammaFS = 1,
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -64,23 +70,36 @@ Problem = {
 		HeatEq = {
 			minRes = 1e-6,
 			maxIter = 10,
+			residual = "Ax_f",
 			BC = {
-
+				FreeSurfaceQh = true
 			}
 		}
 	}
 }
 
 function Problem.IC:initStates(pos)
-	return {0, 0, 0, 650}
+	local g = -Problem.Solver.MomContEq.bodyForce[2]
+	local rho = Problem.Material.rho
+	local p = rho*g*(1 - pos[2])
+
+	return {0, 0, p, 650}
 end
 
 function Problem.IC:initTopStates(pos)
-	return {0, 0, 0, 300}
+	local g = -Problem.Solver.MomContEq.bodyForce[2]
+	local rho = Problem.Material.rho
+	local p = rho*g*(1 - pos[2])
+
+	return {0, 0, p, 300}
 end
 
 function Problem.IC:initBottomStates(pos)
-	return {0, 0, 0, 1000}
+	local g = -Problem.Solver.MomContEq.bodyForce[2]
+	local rho = Problem.Material.rho
+	local p = rho*g*(1 - pos[2])
+	
+	return {0, 0, p, 1000}
 end
 
 function Problem.Solver.HeatEq.BC:TopT(pos, initPos, states, t) 
@@ -91,26 +110,18 @@ function Problem.Solver.MomContEq.BC:TopV(pos, initPos, states, t)
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:BottomT(pos, initPos, states, t) 
+function Problem.Solver.HeatEq.BC:BottomT(pos, t) 
 	return {1000}
 end
 
-function Problem.Solver.MomContEq.BC:BottomV(pos, initPos, states, t) 
+function Problem.Solver.MomContEq.BC:BottomV(pos, t) 
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:LeftQ(pos, initPos, states, t) 
-	return {0}
-end
-
-function Problem.Solver.MomContEq.BC:LeftV(pos, initPos, states, t) 
+function Problem.Solver.MomContEq.BC:LeftV(pos, t) 
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:RightQ(pos, initPos, states, t) 
-	return {0}
-end
-
-function Problem.Solver.MomContEq.BC:RightV(pos, initPos, states, t) 
+function Problem.Solver.MomContEq.BC:RightV(pos, t) 
 	return {0, 0}
 end

@@ -4,14 +4,15 @@ Problem = {
 	verboseOutput = false,
 	
 	Mesh = {
-		hchar = 0.006,
+		hchar = 0.0048,
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
 		addOnFS = true,
 		deleteFlyingNodes = false,
 		boundingBox = {-0.01, -0.01, 0.628, 100},
-		exclusionZones = {{0.29, 0, 0.316, 0.048}},
+		exclusionZones = {{0.292, 0, 0.316, 0.048}},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/2D/damBreakWithObstacle/geometry.msh"
 	},
 	
@@ -24,9 +25,14 @@ Problem = {
 			coordinate = 0 
 		},
 		{
+			kind = "Mass",
+			outputFile = "mass.txt",
+			timeBetweenWriting = 0.01,
+		},
+		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.05,
+			timeBetweenWriting = 0.01,
 			whatToWrite = {"p", "ke"},
 			writeAs = "NodesElements" 
 		}
@@ -35,7 +41,7 @@ Problem = {
 	Material = {
 		mu = 1e-3,
 		gamma = 0,
-		K0 = 2200000,
+		K0 = 22000000,
 		K0p = 7.6,
 		rhoStar = 1000
 	},
@@ -45,11 +51,11 @@ Problem = {
 	},
 	
 	Solver = {
-	    id = "CDS_Meduri",
+	    id = "CDS_dpdt",
 		adaptDT = true,
 		maxDT = 0.001,
 		initialDT = 1e-8,
-		securityCoeff = 1,
+		securityCoeff = 0.1,
 		
 		MomEq = {
 			bodyForce = {0, -9.81},
@@ -59,8 +65,7 @@ Problem = {
 		},
 		
 		ContEq = {
-			strongContinuity = false,
-			enableStab = true,
+			stabilization = "Meduri",
 			BC = {
 
 			}
@@ -84,6 +89,6 @@ function Problem.IC:initStates(pos)
 	end
 end
 
-function Problem.Solver.MomEq.BC:BoundaryV(pos, initPos, states, t)
+function Problem.Solver.MomEq.BC:BoundaryV(pos, t)
 	return {0, 0}
 end

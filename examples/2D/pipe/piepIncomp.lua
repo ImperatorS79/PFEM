@@ -1,45 +1,40 @@
 Problem = {
     id = "IncompNewtonNoT",
-	simulationTime = 4,
-	verboseOutput = false,
+	simulationTime = 6,
+	verboseOutput = true,
 	
 	Mesh = {
-		hchar = 0.0146,
+		hchar = 0.05,
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-0.01, -0.01, 0.594, 100},
 		exclusionZones = {},
-		mshFile = "examples/2D/damBreakKoshizuka/geometry.msh"
+		boundingBox = {-0.01, -0.01, 5, 1.01},
+		laplacianSmoothingBoundaries = false,
+		mshFile = "examples/2D/pipe/geometry.msh"
 	},
 	
 	Extractors = {
 		{
-			kind = "MinMax",
-			outputFile = "tipPosition.txt",
-			timeBetweenWriting = 0.01,
-			minMax = "max",
-			coordinate = 0 
-		},
-		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.05,
-			whatToWrite = {"p", "ke"},
+			timeBetweenWriting = 0.5,
+			whatToWrite = {"p", "u"},
 			writeAs = "NodesElements" 
 		}
 	},
 	
 	Material = {
-		mu = 1e-3,
+		mu = 200,
 		rho = 1000,
 		gamma = 0
 	},
 	
 	IC = {
-		BoundaryFixed = true
+		BoundaryFixed = false,
+		FluidInputFixed = true
 	},
 	
 	Solver = {
@@ -47,13 +42,14 @@ Problem = {
 		adaptDT = true,
 		coeffDTincrease = 1.5,
 		coeffDTDecrease = 2,
-		maxDT = 0.001,
-		initialDT = 0.001,
+		maxDT = 0.025,
+		initialDT = 0.025,
 		
 		MomContEq = {
 			minRes = 1e-6,
 			maxIter = 10,
-			bodyForce = {0, -9.81},
+			bodyForce = {0, 0},
+			gammaFS = 0.5,
 			computePres = false,
 			BC = {
 
@@ -66,6 +62,14 @@ function Problem.IC:initStates(pos)
 	return {0, 0, 0}
 end
 
-function Problem.Solver.MomContEq.BC:BoundaryV(pos, initPos, states, t)
+function Problem.IC:initFluidInputStates(pos)
+	return {1, 0, 0}
+end
+
+function Problem.Solver.MomContEq.BC:BoundaryV(pos, t)
 	return {0, 0}
+end
+
+function Problem.Solver.MomContEq.BC:FluidInputV(pos, t)
+	return {1, 0}
 end

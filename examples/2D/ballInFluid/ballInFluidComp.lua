@@ -7,11 +7,12 @@ Problem = {
 		hchar = 0.025,
 		alpha = 1.2,
 		omega = 0.7,
-		gamma = 0.6,
+		gamma = 0.55,
+		boundingBox = {-0.05, -0.05, 10.05, 100},
+		exclusionZones ={},
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-0.05, -0.05, 10.05, 100},
-		exclusionZones = {},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/2D/ballInFluid/geometry.msh"
 	},
 	
@@ -39,11 +40,11 @@ Problem = {
 	},
 	
 	Solver = {
-	    id = "CDS_Meduri",
+	    id = "CDS_dpdt",
 		adaptDT = true,
 		maxDT = 0.005,
 		initialDT = 1e-8,
-		securityCoeff = 10,
+		securityCoeff = 0.1,
 		
 		MomEq = {
 			bodyForce = {0, -9.81},
@@ -53,8 +54,7 @@ Problem = {
 		},
 		
 		ContEq = {
-			strongContinuity = false,
-			enableStab = true,
+			stabilization = "Meduri",
 			BC = {
 
 			}
@@ -90,10 +90,10 @@ function Problem.IC:initDiskBoundaryStates(pos)
 	return {0, 1, p, rho, 0, 0}
 end
 
-function Problem.Solver.MomEq.BC:BoundaryV(pos, initPos, states, t)
+function Problem.Solver.MomEq.BC:BoundaryV(pos, t)
 	return {0, 0}
 end
 
-function Problem.Solver.MomEq.BC:DiskBoundaryV(pos, initPos, states, t)
+function Problem.Solver.MomEq.BC:DiskBoundaryV(pos, t)
 	return {0, 0}
 end

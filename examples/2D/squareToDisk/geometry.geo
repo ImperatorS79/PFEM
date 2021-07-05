@@ -1,5 +1,5 @@
 //+
-d = 0.1;
+d = 0.025;
 //+
 Point(1) = {0, 0, 0, d};
 //+
@@ -25,4 +25,4 @@ Physical Curve("FreeSurface") = {1};
 //+
 Physical Surface("Fluid") = {1};
 //+
-Transfinite Surface{1};
+//Transfinite Surface{1};

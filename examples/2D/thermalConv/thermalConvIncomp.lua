@@ -12,6 +12,7 @@ Problem = {
 		deleteFlyingNodes = false,
 		boundingBox = {-0.05, -0.05, 1.05, 1.05},
 		exclusionZones = {},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/2D/thermalConv/geometry.msh"
 	},
 	
@@ -32,7 +33,11 @@ Problem = {
 		alpha = 69e-6,
 		Tr = 300,
 		cv = 4.186,
-		gamma = 0
+		gamma = 0,
+		DgammaDT = 0,
+		h = 0,
+		Tinf = 300,
+		epsRad = 0
 	},
 	
 	IC = {
@@ -55,7 +60,7 @@ Problem = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, -9.81},
-			computePres = false,
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -64,6 +69,7 @@ Problem = {
 		HeatEq = {
 			minRes = 1e-6,
 			maxIter = 10,
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -83,34 +89,34 @@ function Problem.IC:initRightStates(pos)
 	return {0, 0, 0, 290}
 end
 
-function Problem.Solver.HeatEq.BC:TopQ(pos, initPos, states, t) 
-	return {0}
-end
-
-function Problem.Solver.MomContEq.BC:TopV(pos, initPos, states, t) 
+function Problem.Solver.HeatEq.BC:TopQ(pos, t) 
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:BottomQ(pos, initPos, states, t) 
-	return {0}
-end
-
-function Problem.Solver.MomContEq.BC:BottomV(pos, initPos, states, t) 
+function Problem.Solver.MomContEq.BC:TopV(pos, t) 
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:LeftT(pos, initPos, states, t) 
+function Problem.Solver.HeatEq.BC:BottomQ(pos, t) 
+	return {0, 0}
+end
+
+function Problem.Solver.MomContEq.BC:BottomV(pos, t) 
+	return {0, 0}
+end
+
+function Problem.Solver.HeatEq.BC:LeftT(pos, t) 
 	return {310}
 end
 
-function Problem.Solver.MomContEq.BC:LeftV(pos, initPos, states, t) 
+function Problem.Solver.MomContEq.BC:LeftV(pos, t) 
 	return {0, 0}
 end
 
-function Problem.Solver.HeatEq.BC:RightT(pos, initPos, states, t) 
+function Problem.Solver.HeatEq.BC:RightT(pos, t) 
 	return {290}
 end
 
-function Problem.Solver.MomContEq.BC:RightV(pos, initPos, states, t) 
+function Problem.Solver.MomContEq.BC:RightV(pos, t) 
 	return {0, 0}
 end
