@@ -283,7 +283,6 @@ void Problem::setInitialCondition()
 
             bool ok = initialCond.checkCallNoThrow("init" + m_pMesh->getNodeType(n) + "States", node.getPosition());
 
-
             if(ok)
                 result = initialCond.call<std::vector<double>>("init" + m_pMesh->getNodeType(n) + "States", node.getPosition());
         }
@@ -369,9 +368,6 @@ void Problem::simulate()
         m_clock.start();
         m_pSolver->computeNextDT();
         m_accumalatedTimes["Compute next dt"] += m_clock.end();
-
-        if(m_pSolver->getTimeStep() < 1e-20)
-            throw std::runtime_error("time step reached nearly zero!");
     }
 
     std::cout << std::endl;

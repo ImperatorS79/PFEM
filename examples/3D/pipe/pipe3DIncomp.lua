@@ -1,25 +1,26 @@
 Problem = {
     id = "IncompNewtonNoT",
-	simulationTime = 4,
+	simulationTime = 6,
 	verboseOutput = true,
 	
 	Mesh = {
 		hchar = 0.1,
 		alpha = 1.2,
-		omega = 0.7,
+		omega = 0.37,
 		gamma = 0.7,
+		boundingBox = {-1, -1, -0.5, 5, 1, 1.5},
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-0.1, -0.1, 5, 1.1},
 		exclusionZones = {},
-		mshFile = "examples/2D/pipe/geometry.msh"
+		laplacianSmoothingBoundaries = false,
+		mshFile = "examples/3D/pipe/geometry.msh"
 	},
 	
 	Extractors = {
 		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.1,
+			timeBetweenWriting = 0.5,
 			whatToWrite = {"p", "u"},
 			writeAs = "NodesElements" 
 		}
@@ -47,8 +48,9 @@ Problem = {
 		MomContEq = {
 			minRes = 1e-6,
 			maxIter = 10,
-			bodyForce = {0, 0},
-			computePres = false,
+			bodyForce = {0, 0, 0},
+			gammaFS = 0.5,
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -57,17 +59,17 @@ Problem = {
 }
 
 function Problem.IC:initStates(pos)
+	return {1, 0, 0, 0}
+end
+
+function Problem.IC:initBoundaryStates(pos)
+	return {0, 0, 0, 0}
+end
+
+function Problem.Solver.MomContEq.BC:BoundaryV(pos, t)
 	return {0, 0, 0}
 end
 
-function Problem.IC:initFluidInputStates(pos)
+function Problem.Solver.MomContEq.BC:FluidInputV(pos, t)
 	return {1, 0, 0}
-end
-
-function Problem.Solver.MomContEq.BC:BoundaryV(pos, initPos, states, t)
-	return {0, 0}
-end
-
-function Problem.Solver.MomContEq.BC:FluidInputV(pos, initPos, states, t)
-	return {1, 0}
 end

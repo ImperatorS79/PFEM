@@ -1,17 +1,18 @@
 Problem = {
     id = "WCompNewtonNoT",
-	simulationTime = 4,
+	simulationTime = 1,
 	verboseOutput = false,
 	
 	Mesh = {
-		hchar = 0.025,
-		alpha = 1.3,
-		omega = 0.35,
-		gamma = 0.8,
+		hchar = 0.05,
+		alpha = 1.2,
+		omega = 0.7,
+		gamma = 0.35,
+		boundingBox = {-1, -1, -1, 1, 1, 100},
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-1, -1, -1, 1, 1, 100},
 		exclusionZones = {},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/3D/dropFallInFluid/geometry.msh"
 	},
 	
@@ -28,21 +29,21 @@ Problem = {
 	Material = {
 		mu = 1e-3,
 		gamma = 0,
-		K0 = 2200000,
+		K0 = 220000,
 		K0p = 7.6,
 		rhoStar = 1000
 	},
 	
 	IC = {
-		BoundaryFixed = true,
+		WallsFixed = true,
 	},
 	
 	Solver = {
-	    id = "CDS_Meduri",
+	    id = "CDS_dpdt",
 		adaptDT = true,
 		maxDT = 0.002,
 		initialDT = 1e-8,
-		securityCoeff = 1,
+		securityCoeff = 0.5,
 		
 		MomEq = {
 			bodyForce = {0, 0, -9.81},
@@ -52,8 +53,7 @@ Problem = {
 		},
 		
 		ContEq = {
-			strongContinuity = false,
-			enableStab = true,
+			stabilization = "Meduri",
 			BC = {
 
 			}
@@ -77,6 +77,6 @@ function Problem.IC:initStates(pos)
 	end
 end
 
-function Problem.Solver.MomEq.BC:BoundaryV(pos, initPos, states, t)
+function Problem.Solver.MomEq.BC:WallsV(pos, t)
 	return {0, 0, 0}
 end

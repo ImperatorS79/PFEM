@@ -1,25 +1,26 @@
 Problem = {
     id = "IncompNewtonNoT",
 	simulationTime = 4,
-	verboseOutput = false,
+	verboseOutput = true,
 	
 	Mesh = {
-		hchar = 0.025,
+		hchar = 0.0146,
 		alpha = 1.2,
 		omega = 0.7,
-		gamma = 0.7,
+		gamma = 0.5,
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-1, -1, -1, 1, 1, 100},
+		boundingBox = {-1, -1, -1, 1.584, 1.175, 100},
 		exclusionZones = {},
-		mshFile = "examples/3D/dropFallInFluid/geometry.msh"
+		laplacianSmoothingBoundaries = false,
+		mshFile = "examples/3D/damBreakKoshizuka/geometry.msh"
 	},
 	
 	Extractors = {
 		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.01,
+			timeBetweenWriting = 0.2,
 			whatToWrite = {"p", "ke"},
 			writeAs = "NodesElements" 
 		}
@@ -40,14 +41,15 @@ Problem = {
 		adaptDT = true,
 		coeffDTincrease = 1.5,
 		coeffDTDecrease = 2,
-		maxDT = 0.001,
-		initialDT = 0.001,
+		maxDT = 0.00025,
+		initialDT = 0.00025,
 		
 		MomContEq = {
 			minRes = 1e-6,
 			maxIter = 10,
 			bodyForce = {0, 0, -9.81},
-			computePres = false,
+			gammaFS = 0.5,
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -56,9 +58,15 @@ Problem = {
 }
 
 function Problem.IC:initStates(pos)
-	return {0, 0, 0, 0}
+	local g = -Problem.Solver.MomContEq.bodyForce[3]
+	local rho = Problem.Material.rho
+	local p = 0
+	if(pos[3] <= 2*0.146 and pos[1] <= 0.146 + 2*Problem.Mesh.hchar) then
+		p = rho*g*(2*0.146 - pos[3])
+	end
+	return {0, 0, 0, p}
 end
 
-function Problem.Solver.MomContEq.BC:BoundaryV(pos, initPos, states, t)
+function Problem.Solver.MomContEq.BC:BoundaryV(pos, t)
 	return {0, 0, 0}
 end

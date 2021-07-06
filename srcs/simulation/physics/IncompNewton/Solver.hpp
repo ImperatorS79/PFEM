@@ -20,16 +20,16 @@ class SIMULATION_API SolverIncompNewton: public Solver
         void computeNextDT() override;
 
     protected:
-		double m_coeffDTincrease;
-		double m_coeffDTDecrease;
+        double m_coeffDTincrease;
+        double m_coeffDTDecrease;
 
-		bool m_solveHeatFirst;
-		bool m_useIterativSolver;
+        bool m_solveHeatFirst;
+        bool m_useIterativSolver;
 
-		std::function<bool()> m_solveFunc;
-		bool m_solveIncompNewtonNoT();
-		bool m_solveBoussinesq();
-		bool m_solveConduction();
+        std::function<bool()> m_solveFunc;
+        bool m_solveIncompNewtonNoT();
+        bool m_solveBoussinesq();
+        bool m_solveConduction();
 
 };
 

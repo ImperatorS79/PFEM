@@ -19,8 +19,6 @@ Problem(luaFilePath)
     else if(m_id == "BoussinesqWC")
         m_statesNumber = 2*m_pMesh->getDim() + 3;
 
-    m_statesNumber += m_pSolver->getAdditionalStateCount();
-
     m_pMesh->setStatesNumber(m_statesNumber);
     addExtractors();
     setInitialCondition();

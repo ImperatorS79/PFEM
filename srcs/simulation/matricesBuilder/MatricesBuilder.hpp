@@ -50,43 +50,43 @@ class MatrixBuilder
     using matVecFuncFacet = std::function<Eigen::Matrix<double, dim*dim - 2*dim + 3, 1>(const Facet&, const NmatTypeLD&,  const NmatTildeTypeLD&, const BmatType&)>;
     using qFuncFacet = std::function<Eigen::Matrix<double, dim, 1>(const Facet&, const std::array<double, 3>& /** gp **/)>;
 
-	public:
-		MatrixBuilder(const Mesh& mesh, unsigned int nGPHD, unsigned int nGPLD);
-		~MatrixBuilder();
+    public:
+        MatrixBuilder(const Mesh& mesh, unsigned int nGPHD, unsigned int nGPLD);
+        ~MatrixBuilder();
 
-		BmatType getB(const GradNmatType& gradN);
-		GradNmatType getGradN(const Element& element);
-		Eigen::Matrix<double, noPerEl, noPerEl>                 getM(const Element& element);
-		Eigen::Matrix<double, noPerEl - 1, noPerEl - 1>         getMGamma(const Facet& facet);
-		Eigen::Matrix<double, dim*noPerEl, dim*noPerEl>         getK(const Element& element, const BmatType& B);
-		Eigen::Matrix<double, noPerEl, dim*noPerEl>             getD(const Element& element, const BmatType& B);
-		Eigen::Matrix<double, noPerEl, noPerEl>                 getL(const Element& element, const BmatType& B, const GradNmatType& gradN);
-		Eigen::Matrix<double, noPerEl, dim*noPerEl>             getC(const Element& element, const BmatType& B, const GradNmatType& gradN);
-		Eigen::Matrix<double, dim*noPerEl, 1>                   getF(const Element& element, const Eigen::Matrix<double, dim, 1>& vec, const BmatType& B);
-		Eigen::Matrix<double, noPerEl - 1, 1>                   getSGamma(const Facet& facet);
-		Eigen::Matrix<double, noPerEl, 1>                       getH(const Element& element, const Eigen::Matrix<double, dim, 1>& vec, const BmatType& B, const GradNmatType& gradN);
-		Eigen::Matrix<double, dim, 1>                           getQN(const Facet& facet);
-		Eigen::Matrix<double, dim*dim - 2*dim +3, 1>            getP(const Facet& facet);
+        BmatType getB(const GradNmatType& gradN);
+        GradNmatType getGradN(const Element& element);
+        Eigen::Matrix<double, noPerEl, noPerEl>                 getM(const Element& element);
+        Eigen::Matrix<double, noPerEl - 1, noPerEl - 1>         getMGamma(const Facet& facet);
+        Eigen::Matrix<double, dim*noPerEl, dim*noPerEl>         getK(const Element& element, const BmatType& B);
+        Eigen::Matrix<double, noPerEl, dim*noPerEl>             getD(const Element& element, const BmatType& B);
+        Eigen::Matrix<double, noPerEl, noPerEl>                 getL(const Element& element, const BmatType& B, const GradNmatType& gradN);
+        Eigen::Matrix<double, noPerEl, dim*noPerEl>             getC(const Element& element, const BmatType& B, const GradNmatType& gradN);
+        Eigen::Matrix<double, dim*noPerEl, 1>                   getF(const Element& element, const Eigen::Matrix<double, dim, 1>& vec, const BmatType& B);
+        Eigen::Matrix<double, noPerEl - 1, 1>                   getSGamma(const Facet& facet);
+        Eigen::Matrix<double, noPerEl, 1>                       getH(const Element& element, const Eigen::Matrix<double, dim, 1>& vec, const BmatType& B, const GradNmatType& gradN);
+        Eigen::Matrix<double, dim, 1>                           getQN(const Facet& facet);
+        Eigen::Matrix<double, dim*dim - 2*dim +3, 1>            getP(const Facet& facet);
         Eigen::Matrix<double, dim*dim - 2*dim +3, dim*dim - 2*dim +3> getT(const Eigen::Matrix<double, dim*dim - 2*dim +3, 1>& P);
         Eigen::Matrix<double, dim*noPerEl, 1>                   getFST(const Facet& facet, const GradNmatType& gradNe, const BmatType& Be);
 
-		void setddev(DdevMatType ddev);
-		void setm(mVecType m);
-		void setMcomputeFactor(simpleMatFuncElm computeFactor);
-		void setMGammacomputeFactor(simpleMatFuncFacet computeFactor);
-		void setKcomputeFactor(matFuncKElm computeFactor);
-		void setDcomputeFactor(matFuncElm computeFactor);
-		void setLcomputeFactor(matFuncElm computeFactor);
-		void setCcomputeFactor(matFuncElm computeFactor);
-		void setFcomputeFactor(matFuncElm computeFactor);
-		void setSGammacomputeFactor(simpleMatFuncFacet computeFactor);
-		void setHcomputeFactor(matFuncElm computeFactor);
-		void setFSTcomputeFactor(matFuncFacet computeFactor);
-		void setQFunc(qFuncFacet func);
+        void setddev(DdevMatType ddev);
+        void setm(mVecType m);
+        void setMcomputeFactor(simpleMatFuncElm computeFactor);
+        void setMGammacomputeFactor(simpleMatFuncFacet computeFactor);
+        void setKcomputeFactor(matFuncKElm computeFactor);
+        void setDcomputeFactor(matFuncElm computeFactor);
+        void setLcomputeFactor(matFuncElm computeFactor);
+        void setCcomputeFactor(matFuncElm computeFactor);
+        void setFcomputeFactor(matFuncElm computeFactor);
+        void setSGammacomputeFactor(simpleMatFuncFacet computeFactor);
+        void setHcomputeFactor(matFuncElm computeFactor);
+        void setFSTcomputeFactor(matFuncFacet computeFactor);
+        void setQFunc(qFuncFacet func);
 
-		template <unsigned short Size>
-		static Eigen::DiagonalMatrix<double, Size> lump2(const Eigen::Matrix<double, Size, Size>& mat)
-		{
+        template <unsigned short Size>
+        static Eigen::DiagonalMatrix<double, Size> lump2(const Eigen::Matrix<double, Size, Size>& mat)
+        {
             Eigen::DiagonalMatrix<double, Size> lumpedMat;
             lumpedMat.setZero();
 
@@ -103,7 +103,7 @@ class MatrixBuilder
 
         template <unsigned short Size>
         static void lump(Eigen::Matrix<double, Size, Size>& mat)
-		{
+        {
             for(auto i = 0; i < mat.cols() ; ++i)
             {
                 for(auto j = 0; j < mat.cols() ; ++j)
@@ -117,7 +117,7 @@ class MatrixBuilder
             }
         }
 
-		static Eigen::Matrix<double, dim*noPerEl, dim*noPerEl> diagBlock(const Eigen::Matrix<double, noPerEl, noPerEl>& mat)
+        static Eigen::Matrix<double, dim*noPerEl, dim*noPerEl> diagBlock(const Eigen::Matrix<double, noPerEl, noPerEl>& mat)
         {
             Eigen::Matrix<double, dim*noPerEl, dim*noPerEl> finalMat;
             finalMat.setZero();

@@ -4,7 +4,7 @@ Problem = {
 	verboseOutput = false,
 	
 	Mesh = {
-		hchar = 0.02,
+		hchar = 0.1,
 		alpha = 1.25,
 		omega = 0.6,
 		gamma = 0.35,
@@ -12,6 +12,7 @@ Problem = {
 		deleteFlyingNodes = false,
 		boundingBox = {-0.1, -0.6, -0.1, 4, 0.6, 100},
 		exclusionZones = {{2.396, -0.2, 0, 2.556, 0.2, 0.16}},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/3D/damBreakWithObstacle/geometry.msh"
 	},
 	
@@ -38,12 +39,12 @@ Problem = {
 	},
 	
 	Solver = {
-	    id = "CDS_Meduri",
+	    id = "CDS_dpdt",
 		adaptDT = true,
 		maxDT = 0.001,
 		maxRemeshDT = 0.05,
 		initialDT = 1e-8,
-		securityCoeff = 100,
+		securityCoeff = 0.1,
 		
 		MomEq = {
 			bodyForce = {0, 0, -9.81},
@@ -53,9 +54,7 @@ Problem = {
 		},
 		
 		ContEq = {
-			strongContinuity = true,
-			enableStab = true,
-			bodyForce = {0, 0, -9.81},
+			stabilization = "Meduri",
 			BC = {
 
 			}
@@ -79,6 +78,6 @@ function Problem.IC:initStates(pos)
 	end
 end
 
-function Problem.Solver.MomEq.BC:WallsV(pos, initPos, states, t)
+function Problem.Solver.MomEq.BC:WallsV(pos, t)
 	return {0, 0, 0}
 end

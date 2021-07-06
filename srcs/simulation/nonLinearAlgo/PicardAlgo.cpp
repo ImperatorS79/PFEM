@@ -35,13 +35,13 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
     std::vector<Eigen::VectorXd> qIterVec(qPrevVec.size());
     std::vector<Eigen::VectorXd> qIterPrevVec(qPrevVec.size());
 
-	for(std::size_t i = 0 ; i < qIterVec.size() ; ++i)
-	{
-		qIterVec[i].resize(qPrevVec[i].rows()); qIterVec[i].setZero();
-		qIterPrevVec[i] = qPrevVec[i];
-	}
+    for(std::size_t i = 0 ; i < qIterVec.size() ; ++i)
+    {
+        qIterVec[i].resize(qPrevVec[i].rows()); qIterVec[i].setZero();
+        qIterPrevVec[i] = qPrevVec[i];
+    }
 
-	unsigned int iterCount = 0;
+    unsigned int iterCount = 0;
     double res = std::numeric_limits<double>::max();
 
     while(res > m_minRes)
@@ -74,7 +74,7 @@ bool PicardAlgo::solve(Mesh* pMesh, const std::vector<Eigen::VectorXd>& qPrevVec
                       << m_minRes << std::endl;
 
         for(std::size_t i = 0 ; i < qIterVec.size() ; ++i)
-			qIterPrevVec[i] = qIterVec[i];
+            qIterPrevVec[i] = qIterVec[i];
 
         if(std::isnan(res))
         {

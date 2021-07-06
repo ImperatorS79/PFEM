@@ -21,11 +21,11 @@ class SIMULATION_API SolverWCompNewton: public Solver
         std::size_t getAdditionalStateCount() const override;
 
     protected:
-		double m_securityCoeff;
+        double m_securityCoeff;
 
-		std::function<bool()> m_solveFunc;
-		bool m_solveWCompNewtonNoT();
-		bool m_solveBoussinesqWC();
+        std::function<bool()> m_solveFunc;
+        bool m_solveWCompNewtonNoT();
+        bool m_solveBoussinesqWC();
 };
 
 #endif // SOLVERWCOMPNEWTON_HPP_INCLUDED

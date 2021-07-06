@@ -69,8 +69,8 @@ class SIMULATION_API Solver
 
         bool m_adaptDT;
         double m_maxDT;
-		double m_initialDT;
-		double m_maxRemeshDT;
+        double m_initialDT;
+        double m_maxRemeshDT;
 
         std::vector<std::unique_ptr<Equation>> m_pEquations;    /**< Smart pointers to the equations */
         bool m_solveSucceed;    /**< Did the solveOneTimeStep function succeeded ? */

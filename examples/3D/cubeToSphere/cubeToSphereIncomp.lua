@@ -1,38 +1,39 @@
 Problem = {
     id = "IncompNewtonNoT",
-	simulationTime = 4,
-	verboseOutput = false,
+	simulationTime = 10.1,
+	verboseOutput = true,
 	
 	Mesh = {
-		hchar = 0.0146,
+		hchar = 0.05,
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-1, -1, -1, 1.584, 1.175, 100},
 		exclusionZones = {},
-		mshFile = "examples/3D/damBreakKoshizuka/geometry.msh"
+		boundingBox = {-2, -2, -2, 2, 2, 2},
+		laplacianSmoothingBoundaries = false,
+		mshFile = "examples/3D/cubeToSphere/geometry.msh"
 	},
 	
 	Extractors = {
 		{
 			kind = "GMSH",
 			outputFile = "results.msh",
-			timeBetweenWriting = 0.2,
+			timeBetweenWriting = 0.1,
 			whatToWrite = {"p", "ke"},
 			writeAs = "NodesElements" 
-		}
+		} 
 	},
 	
 	Material = {
-		mu = 1e-3,
-		rho = 1000,
-		gamma = 0
+		mu = 1.0,
+		rho = 100,
+		gamma = 1.9
 	},
 	
 	IC = {
-		BoundaryFixed = true
+
 	},
 	
 	Solver = {
@@ -41,13 +42,13 @@ Problem = {
 		coeffDTincrease = 1.5,
 		coeffDTDecrease = 2,
 		maxDT = 0.001,
-		initialDT = 0.001,
+		initialDT = 0.0000001,
 		
 		MomContEq = {
 			minRes = 1e-6,
 			maxIter = 10,
-			bodyForce = {0, 0, -9.81},
-			computePres = false,
+			bodyForce = {0, 0, 0},
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -57,8 +58,4 @@ Problem = {
 
 function Problem.IC:initStates(pos)
 	return {0, 0, 0, 0}
-end
-
-function Problem.Solver.MomContEq.BC:BoundaryV(pos, initPos, states, t)
-	return {0, 0, 0}
 end

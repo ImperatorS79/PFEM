@@ -4,14 +4,15 @@ Problem = {
 	verboseOutput = true,
 	
 	Mesh = {
-		hchar = 0.025,
+		hchar = 0.1,
 		alpha = 1.2,
 		omega = 0.7,
 		gamma = 0.7,
 		addOnFS = true,
 		deleteFlyingNodes = false,
-		boundingBox = {-0.1, -0.6, -0.1, 4, 0.6, 100},
+		boundingBox = {-1, -0.6, -0.01, 4, 0.6, 100},
 		exclusionZones = {{2.396, -0.2, 0, 2.556, 0.2, 0.16}},
+		laplacianSmoothingBoundaries = false,
 		mshFile = "examples/3D/damBreakWithObstacle/geometry.msh"
 	},
 	
@@ -36,7 +37,7 @@ Problem = {
 	},
 	
 	Solver = {
-	    id = "FracStep",
+	    id = "PSPG",
 		adaptDT = true,
 		coeffDTincrease = 1.5,
 		coeffDTDecrease = 2,
@@ -48,7 +49,7 @@ Problem = {
 			maxIter = 10,
 			bodyForce = {0, 0, -9.81},
 			gammaFS = 0.5,
-			computePres = false,
+			residual = "Ax_f",
 			BC = {
 
 			}
@@ -69,6 +70,6 @@ function Problem.IC:initStates(pos)
 	end
 end
 
-function Problem.Solver.MomContEq.BC:WallsV(pos, initPos, states, t)
+function Problem.Solver.MomContEq.BC:WallsV(pos, t)
 	return {0, 0, 0}
 end

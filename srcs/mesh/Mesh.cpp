@@ -254,7 +254,7 @@ void Mesh::deleteFlyingNodes(bool verboseOutput) noexcept
 
     std::vector<bool> toBeDeletedNodes(m_nodesList.size(), false);   //Should the node be deleted
 
-	std::size_t nodesToDeleteCount = 0;
+    std::size_t nodesToDeleteCount = 0;
     std::vector<std::size_t> nodesIndexesDeleted = {};
 
     //If the whole element is out of the bounding box, we delete it.
@@ -264,20 +264,20 @@ void Mesh::deleteFlyingNodes(bool verboseOutput) noexcept
         if(m_nodesList[n].isFree() && !m_nodesList[n].isBound())
         {
             toBeDeletedNodes[n] = true;
-			nodesToDeleteCount++;
+            nodesToDeleteCount++;
         }
     }
 
-	nodesIndexesDeleted.resize(nodesToDeleteCount);
-	std::size_t count = 0;
+    nodesIndexesDeleted.resize(nodesToDeleteCount);
+    std::size_t count = 0;
     for(std::size_t n = 0 ; n < toBeDeletedNodes.size() ; ++n)
     {
-		if(toBeDeletedNodes[n])
-		{
-			nodesIndexesDeleted[count] = n;
-			count++;
-		}
-	}
+        if(toBeDeletedNodes[n])
+        {
+            nodesIndexesDeleted[count] = n;
+            count++;
+        }
+    }
 
 
     m_nodesList.erase(

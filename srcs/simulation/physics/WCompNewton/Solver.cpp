@@ -15,7 +15,7 @@ std::make_unique<Eq<dim>>( \
 SolverWCompNewton::SolverWCompNewton(Problem* pProblem, Mesh* pMesh, std::vector<SolTable> problemParams):
 Solver(pProblem, pMesh, problemParams)
 {
-	//Check if the asked problem and solver are supported
+    //Check if the asked problem and solver are supported
     if(m_pProblem->getID() != "WCompNewtonNoT" && m_pProblem->getID() != "BoussinesqWC")
         throw std::runtime_error("this solver cannot be used with problem whose id is " + m_pProblem->getID());
 
@@ -31,7 +31,7 @@ Solver(pProblem, pMesh, problemParams)
 
     unsigned int dim = m_pMesh->getDim();
 
-	//Load equations depending of the problem
+    //Load equations depending of the problem
     std::vector<unsigned short> bcFlags;
     std::vector<unsigned int> statesIndex;
     if(m_pProblem->getID() == "WCompNewtonNoT")
@@ -39,16 +39,16 @@ Solver(pProblem, pMesh, problemParams)
         //Momentum and continuity equations
         m_pEquations.resize(2);
 
-		bcFlags = {0};
-		statesIndex = {dim, dim + 1, 0};
-		if(m_pMesh->getDim() == 2)
+        bcFlags = {0};
+        statesIndex = {dim, dim + 1, 0};
+        if(m_pMesh->getDim() == 2)
             m_pEquations[0] = REGISTER_EQ(ContEqWCompNewton, 2)
         else
             m_pEquations[0] = REGISTER_EQ(ContEqWCompNewton, 3)
 
-		bcFlags = {0};
-		statesIndex = {0, dim + 2, dim, dim + 1};
-		if(m_pMesh->getDim() == 2)
+        bcFlags = {0};
+        statesIndex = {0, dim + 2, dim, dim + 1};
+        if(m_pMesh->getDim() == 2)
             m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 2)
         else
             m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 3)
@@ -75,15 +75,15 @@ Solver(pProblem, pMesh, problemParams)
         m_pEquations.resize(3);
 
         bcFlags = {0};
-		statesIndex = {dim, dim + 1, 0, 2*dim + 2};
-		if(m_pMesh->getDim() == 2)
+        statesIndex = {dim, dim + 1, 0, 2*dim + 2};
+        if(m_pMesh->getDim() == 2)
             m_pEquations[0] = REGISTER_EQ(ContEqWCompNewton, 2)
         else
             m_pEquations[0] = REGISTER_EQ(ContEqWCompNewton, 3)
 
-		bcFlags = {0};
-		statesIndex = {0, dim + 2, dim, dim + 1, 2*dim + 2};
-		if(m_pMesh->getDim() == 2)
+        bcFlags = {0};
+        statesIndex = {0, dim + 2, dim, dim + 1, 2*dim + 2};
+        if(m_pMesh->getDim() == 2)
             m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 2)
         else
             m_pEquations[1] = REGISTER_EQ(MomEqWCompNewton, 3)
@@ -146,7 +146,7 @@ Solver(pProblem, pMesh, problemParams)
         }
 
         m_solveFunc = std::bind(&SolverWCompNewton::m_solveBoussinesqWC, this);
-	}
+    }
 
     m_securityCoeff = m_solverParams[0].checkAndGet<double>("securityCoeff");
 
